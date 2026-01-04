@@ -32,7 +32,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
 
     // Then filter by search query (if exists) OR date selection
     const displayRecords = useMemo(() => {
-        if (searchQuery.trim()) {
+        if (isSearchMode) {
+            if (!searchQuery.trim()) return []; // Return empty if searching but no input
+            
             const lowerQ = searchQuery.toLowerCase();
             return categoryRecords.filter(r => {
                 const amountMatch = r.amount.toString().includes(lowerQ);
@@ -55,7 +57,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
         } else {
             return categoryRecords.filter(r => r.date === selDate);
         }
-    }, [categoryRecords, searchQuery, selDate]);
+    }, [categoryRecords, searchQuery, isSearchMode, selDate]);
     
     // Calendar grid calculations
     const getDayInfo = (d: number) => {
@@ -131,7 +133,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
             </div>
 
             {/* Conditionally Render Calendar & Details only when NOT searching */}
-            {!searchQuery && !isSearchMode && (
+            {!isSearchMode && (
                 <>
                     {showPicker && (
                         <div className="absolute top-44 left-6 right-6 bg-white p-4 shadow-xl rounded-2xl z-20 border border-gray-100 animate-fade-in">
@@ -162,18 +164,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
                                         <span className={`relative z-10 text-[10px] font-medium leading-none ${isSel?'text-muji-ink font-bold':'text-gray-400'}`}>{day}</span>
                                         {info.hasData && (
                                             <div className="flex flex-col items-center gap-0.5 mt-0.5 w-full px-0.5">
-                                                {category === 'daily' && (
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        {info.incCount > 0 && <span className="flex items-center text-[8px] text-muji-red font-bold"><span className="w-1 h-1 rounded-full bg-muji-red mr-0.5"></span>{info.incCount}</span>}
-                                                        {info.expCount > 0 && <span className="flex items-center text-[8px] text-muji-green font-bold"><span className="w-1 h-1 rounded-full bg-muji-green mr-0.5"></span>{info.expCount}</span>}
-                                                    </div>
-                                                )}
-                                                {category === 'tea' && info.count > 0 && (
-                                                    <div className=""><span className="inline-block px-1.5 py-0.5 rounded-full bg-muji-kraft text-white text-[8px] leading-none font-medium scale-90">{info.count}杯</span></div>
-                                                )}
-                                                {category === 'mahjong' && info.count > 0 && (
-                                                    <div className=""><span className="inline-block px-1.5 py-0.5 rounded-full bg-muji-ink text-white text-[8px] leading-none font-medium scale-90">{info.count}將</span></div>
-                                                )}
+                                                {/* Unified Count Indicators Style - Using Dot+Number for all categories for consistency */}
+                                                <div className="flex items-center justify-center gap-1 h-3">
+                                                    {category === 'daily' && (
+                                                        <>
+                                                            {info.incCount > 0 && <span className="flex items-center text-[8px] text-muji-red font-bold"><span className="w-1 h-1 rounded-full bg-muji-red mr-0.5"></span>{info.incCount}</span>}
+                                                            {info.expCount > 0 && <span className="flex items-center text-[8px] text-muji-green font-bold"><span className="w-1 h-1 rounded-full bg-muji-green mr-0.5"></span>{info.expCount}</span>}
+                                                        </>
+                                                    )}
+                                                    {/* For Tea and Mahjong, use the same "green dot style" (dot + number) */}
+                                                    {category === 'tea' && info.count > 0 && (
+                                                        <span className="flex items-center text-[8px] text-muji-text font-bold"><span className="w-1 h-1 rounded-full bg-muji-kraft mr-0.5"></span>{info.count}</span>
+                                                    )}
+                                                    {category === 'mahjong' && info.count > 0 && (
+                                                        <span className="flex items-center text-[8px] text-muji-text font-bold"><span className="w-1 h-1 rounded-full bg-muji-ink mr-0.5"></span>{info.count}</span>
+                                                    )}
+                                                </div>
                                                 <span className={`text-[9px] font-bold tracking-tight leading-none ${info.total >= 0 ? 'text-muji-red' : 'text-muji-green'}`}>{Math.abs(info.total)}</span>
                                             </div>
                                         )}
@@ -188,12 +194,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
             {/* List Header */}
             <div className="mt-6 space-y-3">
                 <h3 className="text-xs text-gray-400 uppercase tracking-widest pl-2 mb-2 font-sans">
-                    {(searchQuery || isSearchMode) ? `搜尋結果: ${displayRecords.length} 筆` : `${selDate} • ${category==='daily'?'日常':category==='tea'?'手搖':'麻將'}`}
+                    {isSearchMode ? `搜尋結果: ${displayRecords.length} 筆` : `${selDate} • ${category==='daily'?'日常':category==='tea'?'手搖':'麻將'}`}
                 </h3>
                 
                 {displayRecords.length === 0 && (
                     <div className="text-center py-8 text-gray-300 text-sm italic">
-                        {searchQuery ? "沒有符合的搜尋結果" : "本日無紀錄"}
+                        {isSearchMode && !searchQuery ? "請輸入關鍵字開始搜尋" : isSearchMode ? "沒有符合的搜尋結果" : "本日無紀錄"}
                     </div>
                 )}
 
@@ -204,7 +210,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                     <p className="font-medium text-muji-text text-sm truncate">{r.category==='daily'?(r as DailyRecord).subCategory:r.category==='tea'?(r as TeaRecord).shop:'麻將'}</p>
-                                    {(searchQuery || isSearchMode) && <span className="text-[10px] text-gray-400 bg-gray-50 px-1 rounded flex-shrink-0">{r.date}</span>}
+                                    {(isSearchMode) && <span className="text-[10px] text-gray-400 bg-gray-50 px-1 rounded flex-shrink-0">{r.date}</span>}
                                 </div>
                                 <p className="text-xs text-gray-400 truncate">
                                     {r.category==='tea' ? 

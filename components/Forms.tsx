@@ -153,9 +153,9 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
                 <input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}/>
             </div>
             
-            <div className="flex gap-2">
-                <input placeholder="備註..." value={data.note} onChange={e=>setData({...data, note:e.target.value})} className="flex-1 bg-gray-50 p-3 rounded-lg text-sm outline-none text-muji-text placeholder-gray-400"/>
-                <button onClick={handleSaveTemplate} className="p-3 rounded-lg bg-gray-100 text-gray-400 hover:text-muji-ink hover:bg-gray-200 transition" title="存為樣板">
+            <div className="flex gap-2 w-full">
+                <input placeholder="備註..." value={data.note} onChange={e=>setData({...data, note:e.target.value})} className="flex-1 min-w-0 bg-gray-50 p-3 rounded-lg text-sm outline-none text-muji-text placeholder-gray-400"/>
+                <button onClick={handleSaveTemplate} className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 text-gray-400 hover:text-muji-ink hover:bg-gray-200 transition" title="存為樣板">
                     <Icons.Bookmark size={20} />
                 </button>
             </div>
