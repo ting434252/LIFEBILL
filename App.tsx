@@ -4,8 +4,8 @@ import { DailyForm, TeaForm, MahjongForm } from './components/Forms';
 import { CalendarView } from './components/views/CalendarView';
 import { StatsView } from './components/views/StatsView';
 import { ConfirmModal } from './components/ui/UI';
-import { CategorySettings, PlayerSettings, SettingsItem } from './components/Settings';
-import { AppRecord, CategoryConfig, CategoryType, ConfirmDialogState, NotificationState, DailyRecord } from './types';
+import { CategorySettings, PlayerSettings, TemplateSettings, SettingsItem } from './components/Settings';
+import { AppRecord, CategoryConfig, CategoryType, ConfirmDialogState, NotificationState, DailyRecord, Template } from './types';
 
 // Helper for currency formatting
 const formatMoney = (amount: number) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(amount);
@@ -14,13 +14,16 @@ const App = () => {
     const [currentTab, setCurrentTab] = useState<'add' | 'calendar' | 'stats'>('add');
     const [currentCategory, setCurrentCategory] = useState<CategoryType>('daily');
     const [showSettings, setShowSettings] = useState(false);
-    const [settingsPage, setSettingsPage] = useState<'menu' | 'categories' | 'players'>('menu');
+    const [settingsPage, setSettingsPage] = useState<'menu' | 'categories' | 'players' | 'templates'>('menu');
     const [records, setRecords] = useState<AppRecord[]>([]);
     const [year] = useState(new Date().getFullYear());
     const [notification, setNotification] = useState<NotificationState | null>(null); 
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, message: '', onConfirm: null, isDestructive: false });
     const [editingRecord, setEditingRecord] = useState<AppRecord | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Lifted State for Search Mode in CalendarView
+    const [isSearchMode, setIsSearchMode] = useState(false);
     
     // NOTE: Keep internal storage keys as 'tina_journal' to preserve user data
     const [categories, setCategories] = useState<CategoryConfig>({
@@ -29,6 +32,7 @@ const App = () => {
     });
 
     const [mahjongPlayers, setMahjongPlayers] = useState<string[]>(['阿明', '小華', '美美']);
+    const [templates, setTemplates] = useState<Template[]>([]);
 
     // --- Persist Data ---
     useEffect(() => {
@@ -36,6 +40,8 @@ const App = () => {
         if (savedCats) { try { setCategories(JSON.parse(savedCats)); } catch(e) {} }
         const savedPlayers = localStorage.getItem('tina_journal_players');
         if (savedPlayers) { try { setMahjongPlayers(JSON.parse(savedPlayers)); } catch(e) {} }
+        const savedTemplates = localStorage.getItem('tina_journal_templates');
+        if (savedTemplates) { try { setTemplates(JSON.parse(savedTemplates)); } catch(e) {} }
     }, []);
 
     useEffect(() => {
@@ -45,6 +51,10 @@ const App = () => {
     useEffect(() => {
         localStorage.setItem('tina_journal_players', JSON.stringify(mahjongPlayers));
     }, [mahjongPlayers]);
+
+    useEffect(() => {
+        localStorage.setItem('tina_journal_templates', JSON.stringify(templates));
+    }, [templates]);
 
     useEffect(() => {
         const localData = localStorage.getItem(`tina_journal_${year}`);
@@ -108,6 +118,25 @@ const App = () => {
             }
         });
     };
+    
+    // --- Template Actions ---
+    const handleDeleteTemplate = (id: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            message: "確定要刪除此樣板嗎？",
+            isDestructive: true,
+            onConfirm: () => {
+                setTemplates(prev => prev.filter(t => t.id !== id));
+                closeConfirm();
+                showNotification("已刪除樣板", "delete");
+            }
+        });
+    };
+
+    const handleRenameTemplate = (id: string, newName: string) => {
+        setTemplates(prev => prev.map(t => t.id === id ? { ...t, name: newName } : t));
+        showNotification("已更新樣板", "edit");
+    };
 
     const handleClearAllData = () => {
         setConfirmDialog({
@@ -133,7 +162,7 @@ const App = () => {
             categories,
             players: mahjongPlayers,
             records,
-            templates: JSON.parse(localStorage.getItem('tina_journal_templates') || '[]')
+            templates
         };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -167,7 +196,7 @@ const App = () => {
                         if (data.categories) setCategories(data.categories);
                         if (data.players) setMahjongPlayers(data.players);
                         if (data.records) setRecords(data.records);
-                        if (data.templates) localStorage.setItem('tina_journal_templates', JSON.stringify(data.templates));
+                        if (data.templates) setTemplates(data.templates);
                         
                         showNotification("資料還原成功！", 'success');
                         closeConfirm();
@@ -338,7 +367,7 @@ const App = () => {
                             <button onClick={()=>setEditingRecord(null)} className="p-2 text-gray-400 hover:text-gray-600"><Icons.X size={20}/></button>
                         </div>
                         <div className="p-6">
-                            {editingRecord.category === 'daily' && <DailyForm initialData={editingRecord} onSubmit={handleUpdateRecord} categories={categories} isEditing showNotification={showNotification} />}
+                            {editingRecord.category === 'daily' && <DailyForm initialData={editingRecord} onSubmit={handleUpdateRecord} categories={categories} isEditing showNotification={showNotification} templates={templates} setTemplates={setTemplates} onDeleteTemplate={handleDeleteTemplate} />}
                             {editingRecord.category === 'tea' && <TeaForm initialData={editingRecord} onSubmit={handleUpdateRecord} records={records} isEditing showNotification={showNotification} />}
                             {editingRecord.category === 'mahjong' && <MahjongForm initialData={editingRecord} onSubmit={handleUpdateRecord} records={records} isEditing showNotification={showNotification} players={mahjongPlayers} />}
                         </div>
@@ -369,6 +398,7 @@ const App = () => {
                                         <div className="space-y-1">
                                             <SettingsItem icon={<Icons.List size={18}/>} label="類別管理" onClick={()=>setSettingsPage('categories')} subLabel="自訂收支項目"/>
                                             <SettingsItem icon={<Icons.Users size={18}/>} label="麻友管理" onClick={()=>setSettingsPage('players')} subLabel="設定牌咖名單"/>
+                                            <SettingsItem icon={<Icons.Bookmark size={18}/>} label="樣板管理" onClick={()=>setSettingsPage('templates')} subLabel="管理快速記帳樣板"/>
                                             <div className="h-[1px] bg-gray-200 ml-10 my-1"></div>
                                             <SettingsItem icon={<Icons.DownloadCloud size={18}/>} label="備份資料 (JSON)" onClick={handleExportJSON} subLabel="下載完整備份檔"/>
                                             <SettingsItem icon={<Icons.UploadCloud size={18}/>} label="還原資料" onClick={handleImportClick} subLabel="匯入備份檔"/>
@@ -382,8 +412,10 @@ const App = () => {
                                 </div>
                             ) : settingsPage === 'categories' ? (
                                 <CategorySettings categories={categories} onAdd={addCategory} onRemove={removeCategory} setCategories={setCategories} showNotification={showNotification} />
-                            ) : (
+                            ) : settingsPage === 'players' ? (
                                 <PlayerSettings players={mahjongPlayers} onAdd={addPlayer} onRemove={removePlayer} setPlayers={setMahjongPlayers} showNotification={showNotification} />
+                            ) : (
+                                <TemplateSettings templates={templates} onDelete={handleDeleteTemplate} onRename={handleRenameTemplate} showNotification={showNotification} />
                             )}
                         </div>
                         <div className="p-6 text-center border-t border-white/50">
@@ -401,13 +433,13 @@ const App = () => {
                     {currentTab === 'add' && (
                         <div className="px-6 animate-fade-in">
                             <div className="bg-muji-white p-6 rounded-3xl shadow-card border border-muji-border animate-slide-up mb-2">
-                                {currentCategory === 'daily' && <DailyForm onAdd={handleAddRecord} categories={categories} showNotification={showNotification} />}
+                                {currentCategory === 'daily' && <DailyForm onAdd={handleAddRecord} categories={categories} showNotification={showNotification} templates={templates} setTemplates={setTemplates} onDeleteTemplate={handleDeleteTemplate} />}
                                 {currentCategory === 'tea' && <TeaForm onAdd={handleAddRecord} records={records} showNotification={showNotification} />}
                                 {currentCategory === 'mahjong' && <MahjongForm onAdd={handleAddRecord} records={records} showNotification={showNotification} players={mahjongPlayers} />}
                             </div>
                         </div>
                     )}
-                    {currentTab === 'calendar' && <CalendarView records={records} onDelete={handleDelete} onEdit={setEditingRecord} onDuplicate={handleDuplicateRecord} category={currentCategory} />}
+                    {currentTab === 'calendar' && <CalendarView records={records} onDelete={handleDelete} onEdit={setEditingRecord} onDuplicate={handleDuplicateRecord} category={currentCategory} isSearchMode={isSearchMode} setIsSearchMode={setIsSearchMode} />}
                     {currentTab === 'stats' && <StatsView records={records} category={currentCategory} categories={categories} />}
                 </div>
             </main>
@@ -416,9 +448,9 @@ const App = () => {
             <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto">
                 <div className="px-4 pb-2"><CategoryTabs current={currentCategory} set={setCurrentCategory} /></div>
                 <nav className="bg-white shadow-nav flex justify-around items-center pb-safe pt-2 border-t border-gray-100">
-                    <NavBtn active={currentTab === 'calendar'} onClick={() => setCurrentTab('calendar')} icon={<Icons.Calendar />} />
-                    <NavBtn active={currentTab === 'add'} onClick={() => setCurrentTab('add')} icon={<Icons.Plus />} />
-                    <NavBtn active={currentTab === 'stats'} onClick={() => setCurrentTab('stats')} icon={<Icons.PieChart />} />
+                    <NavBtn active={currentTab === 'calendar'} onClick={() => { setCurrentTab('calendar'); setIsSearchMode(false); }} icon={<Icons.Calendar />} />
+                    <NavBtn active={currentTab === 'add'} onClick={() => { setCurrentTab('add'); setIsSearchMode(false); }} icon={<Icons.Plus />} />
+                    <NavBtn active={currentTab === 'stats'} onClick={() => { setCurrentTab('stats'); setIsSearchMode(false); }} icon={<Icons.PieChart />} />
                 </nav>
             </div>
         </div>

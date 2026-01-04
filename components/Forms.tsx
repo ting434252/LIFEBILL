@@ -11,6 +11,8 @@ const getTodayString = () => {
     return `${year}-${month}-${day}`;
 };
 
+const formatMoney = (amount: number) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(amount);
+
 interface FormProps {
     onAdd?: (record: any) => void;
     onSubmit?: (record: any) => void;
@@ -20,22 +22,21 @@ interface FormProps {
     categories?: CategoryConfig;
     records?: AppRecord[];
     players?: string[];
+    templates?: Template[];
+    setTemplates?: React.Dispatch<React.SetStateAction<Template[]>>;
+    onDeleteTemplate?: (id: string) => void;
 }
 
-export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, initialData, isEditing, showNotification }) => {
+export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, initialData, isEditing, showNotification, templates = [], setTemplates, onDeleteTemplate }) => {
     const [data, setData] = useState<Partial<DailyRecord> & { sub: string, amt: string }>(() => {
         if (initialData) return { date: initialData.date, type: initialData.type, sub: initialData.subCategory, amt: String(initialData.amount), note: initialData.note || '' };
         return { date: getTodayString(), type: 'expense', sub: '餐飲', amt: '', note: '' };
     });
     
-    // Templates State
-    const [templates, setTemplates] = useState<Template[]>([]);
-    const [showTemplateModal, setShowTemplateModal] = useState(false);
-
-    useEffect(() => {
-        const saved = localStorage.getItem('tina_journal_templates');
-        if (saved) try { setTemplates(JSON.parse(saved)); } catch {}
-    }, []);
+    // UI States
+    const [showTemplateList, setShowTemplateList] = useState(false);
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [templateNameInput, setTemplateNameInput] = useState('');
 
     // Default to first category if current doesn't exist in new type
     const cats = data.type === 'expense' ? categories?.expense : categories?.income;
@@ -52,19 +53,50 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
         else if (onAdd) { onAdd(payload); setData({...data, amt: '', note: ''}); }
     };
 
-    const handleSaveTemplate = () => {
-        if(!data.amt || Number(data.amt) <= 0) return showNotification("請先輸入金額與項目", "error");
+    const handleSaveClick = () => {
+        if(!data.amt || Number(data.amt) <= 0) {
+            showNotification("請先輸入金額與項目", "error");
+            return;
+        }
+        
+        const noteToSave = data.note ? data.note.trim() : '';
+        
+        // Duplicate Check
+        const isDuplicate = templates.some(t => 
+            t.type === data.type &&
+            t.subCategory === data.sub &&
+            t.amount === Number(data.amt) &&
+            t.note === noteToSave
+        );
+
+        if (isDuplicate) {
+            showNotification("已有相同樣板", "error");
+            return;
+        }
+
+        // Pre-fill Logic: If note exists, use note. Else use Category.
+        const defaultName = noteToSave || data.sub;
+        setTemplateNameInput(defaultName);
+        setShowSaveModal(true);
+    };
+
+    const confirmSaveTemplate = () => {
+        const noteToSave = data.note ? data.note.trim() : '';
+        const defaultName = noteToSave || data.sub;
+        const finalName = templateNameInput.trim() || defaultName;
+
         const newTemplate: Template = {
             id: Date.now().toString(),
-            name: data.note || data.sub,
+            name: finalName,
             type: data.type as 'income'|'expense',
             subCategory: data.sub,
             amount: Number(data.amt),
-            note: data.note || ''
+            note: noteToSave
         };
+        
         const updated = [...templates, newTemplate];
-        setTemplates(updated);
-        localStorage.setItem('tina_journal_templates', JSON.stringify(updated));
+        if (setTemplates) setTemplates(updated);
+        setShowSaveModal(false);
         showNotification("已儲存為快速樣板", "success");
     };
 
@@ -74,36 +106,40 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
             type: t.type,
             sub: t.subCategory,
             amt: String(t.amount),
-            note: t.note
+            note: t.name // Use template Name as Note
         }));
-        setShowTemplateModal(false);
+        setShowTemplateList(false);
     };
 
-    const handleDeleteTemplate = (e: React.MouseEvent, id: string) => {
+    const handleDeleteClick = (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if(window.confirm('確定刪除此樣板？')) {
-            const updated = templates.filter(t => t.id !== id);
-            setTemplates(updated);
-            localStorage.setItem('tina_journal_templates', JSON.stringify(updated));
+        if (onDeleteTemplate) {
+            onDeleteTemplate(id);
+        } else {
+            // Fallback if not passed
+             if(window.confirm('確定刪除此樣板？')) {
+                const updated = templates.filter(t => t.id !== id);
+                if (setTemplates) setTemplates(updated);
+            }
         }
     };
     
     return (
         <div className="space-y-5">
-            {/* Type Selection: Big Buttons */}
+            {/* Type Selection */}
             <div className="flex gap-3">
-                <button onClick={()=>setData({...data, type:'expense'})} className={`flex-1 py-3 rounded-xl text-sm font-bold tracking-widest transition-all shadow-sm ${data.type==='expense' ? 'bg-muji-green text-white transform scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>支出</button>
-                <button onClick={()=>setData({...data, type:'income'})} className={`flex-1 py-3 rounded-xl text-sm font-bold tracking-widest transition-all shadow-sm ${data.type==='income' ? 'bg-muji-red text-white transform scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>收入</button>
+                <button type="button" onClick={()=>setData({...data, type:'expense'})} className={`flex-1 py-3 rounded-xl text-sm font-bold tracking-widest transition-all shadow-sm ${data.type==='expense' ? 'bg-muji-green text-white transform scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>支出</button>
+                <button type="button" onClick={()=>setData({...data, type:'income'})} className={`flex-1 py-3 rounded-xl text-sm font-bold tracking-widest transition-all shadow-sm ${data.type==='income' ? 'bg-muji-red text-white transform scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>收入</button>
             </div>
 
-            {/* Template Modal */}
-            {showTemplateModal && (
+            {/* Template List Modal */}
+            {showTemplateList && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-fade-in">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" onClick={()=>setShowTemplateModal(false)}></div>
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" onClick={()=>setShowTemplateList(false)}></div>
                     <div className="bg-muji-paper w-full max-w-[300px] rounded-3xl shadow-2xl flex flex-col animate-pop relative z-10 max-h-[60vh]">
                         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-3xl sticky top-0 z-10">
                             <h3 className="font-bold text-muji-text text-sm tracking-wide">選擇快速樣板</h3>
-                            <button onClick={()=>setShowTemplateModal(false)}><Icons.X size={18} className="text-gray-400"/></button>
+                            <button type="button" onClick={()=>setShowTemplateList(false)}><Icons.X size={18} className="text-gray-400"/></button>
                         </div>
                         <div className="overflow-y-auto p-3 space-y-2 hide-scrollbar">
                             {templates.length === 0 ? (
@@ -114,18 +150,63 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
                                 </div>
                             ) : (
                                 templates.map(t => (
-                                    <div key={t.id} onClick={() => handleApplyTemplate(t)} className="bg-white p-3 rounded-xl border border-gray-100 flex justify-between items-center hover:border-muji-ink transition cursor-pointer active:scale-95 duration-200">
-                                        <div className="flex-1 min-w-0 pr-2">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className={`text-sm font-bold ${t.type==='expense'?'text-muji-green':'text-muji-red'}`}>${t.amount}</span>
-                                                <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{t.subCategory}</span>
-                                            </div>
-                                            <span className="text-xs text-gray-400 block truncate">{t.name}</span>
+                                    <div key={t.id} onClick={() => handleApplyTemplate(t)} className="bg-white p-3 rounded-xl border border-gray-100 flex justify-between items-center hover:border-muji-ink transition cursor-pointer active:scale-95 duration-200 shadow-sm">
+                                        <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                                            {/* Order: Category -> Name -> Amount */}
+                                            <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0 tracking-wide">{t.subCategory}</span>
+                                            <span className="text-sm text-muji-text truncate font-medium">{t.name}</span>
                                         </div>
-                                        <button onClick={(e) => handleDeleteTemplate(e, t.id)} className="p-2 text-gray-200 hover:text-red-400 hover:bg-red-50 rounded-full transition"><Icons.Trash size={16}/></button>
+                                        <div className="flex items-center gap-3 pl-2 flex-shrink-0">
+                                            <span className={`text-sm font-bold ${t.type==='expense'?'text-muji-green':'text-muji-red'}`}>{formatMoney(t.amount)}</span>
+                                            <button type="button" onClick={(e) => handleDeleteClick(e, t.id)} className="p-1.5 text-gray-200 hover:text-red-400 hover:bg-red-50 rounded-full transition"><Icons.Trash size={14}/></button>
+                                        </div>
                                     </div>
                                 ))
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Save Template Preview Modal */}
+            {showSaveModal && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" onClick={()=>setShowSaveModal(false)}></div>
+                    <div className="bg-white w-full max-w-[300px] rounded-3xl shadow-2xl overflow-hidden animate-pop relative z-10 flex flex-col">
+                         <div className="p-4 bg-gray-50 border-b border-gray-100 text-center">
+                            <h3 className="font-bold text-muji-text text-sm">儲存為樣板</h3>
+                        </div>
+                        
+                        <div className="p-5 flex flex-col gap-2">
+                             <p className="text-[10px] text-gray-400 mb-1">樣板預覽與命名</p>
+                             {/* Card Preview that mimics the list item */}
+                             <div className="bg-white p-3 rounded-xl border border-gray-100 flex items-center gap-3 shadow-sm">
+                                {/* Category Tag */}
+                                <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0 tracking-wide">{data.sub}</span>
+                                
+                                {/* Name Input Inline */}
+                                <input 
+                                    value={templateNameInput}
+                                    onChange={(e) => setTemplateNameInput(e.target.value)}
+                                    placeholder={data.note || data.sub}
+                                    maxLength={10}
+                                    className="flex-1 min-w-0 text-sm font-medium text-muji-text outline-none bg-transparent placeholder-gray-300 focus:text-muji-ink transition-colors"
+                                    autoFocus
+                                />
+                                
+                                {/* Amount */}
+                                <span className={`text-sm font-bold ${data.type==='expense'?'text-muji-green':'text-muji-red'}`}>
+                                    {formatMoney(Number(data.amt))}
+                                </span>
+                             </div>
+                             <p className="text-[10px] text-gray-300 text-center mt-1">
+                                {templateNameInput.length > 0 ? `字數: ${templateNameInput.length}/10` : '未命名將使用預設名稱'}
+                             </p>
+                        </div>
+
+                        <div className="flex border-t border-gray-100">
+                            <button onClick={()=>setShowSaveModal(false)} className="flex-1 py-3 text-gray-400 hover:bg-gray-50 transition text-sm font-medium border-r border-gray-100">取消</button>
+                            <button onClick={confirmSaveTemplate} className="flex-1 py-3 text-muji-ink hover:bg-gray-50 hover:text-muji-text transition text-sm font-bold">確認儲存</button>
                         </div>
                     </div>
                 </div>
@@ -136,7 +217,7 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
                 <div className="flex-1">
                     <FormDatePicker value={data.date || ''} onChange={e=>setData({...data, date:e.target.value})} />
                 </div>
-                <button onClick={() => setShowTemplateModal(true)} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 text-gray-400 hover:text-muji-ink hover:bg-gray-100 transition border border-transparent hover:border-gray-200">
+                <button type="button" onClick={() => setShowTemplateList(true)} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 text-gray-400 hover:text-muji-ink hover:bg-gray-100 transition border border-transparent hover:border-gray-200 active:scale-95">
                     <Icons.List size={16} />
                     <span className="text-xs">樣板 ({templates.length})</span>
                 </button>
@@ -144,7 +225,7 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
 
             <div className="grid grid-cols-5 gap-2">
                 {cats && cats.length > 0 ? cats.map(c => (
-                    <button key={c} onClick={()=>setData({...data, sub:c})} className={`py-2 text-xs rounded-lg transition-all w-full truncate ${data.sub===c ? 'bg-muji-ink text-white' : 'bg-gray-100 text-gray-500'}`} title={c}>{c}</button>
+                    <button type="button" key={c} onClick={()=>setData({...data, sub:c})} className={`py-2 text-xs rounded-lg transition-all w-full truncate ${data.sub===c ? 'bg-muji-ink text-white' : 'bg-gray-100 text-gray-500'}`} title={c}>{c}</button>
                 )) : <span className="text-xs text-gray-400 col-span-5 text-center">請至設定新增類別</span>}
             </div>
             
@@ -155,12 +236,12 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
             
             <div className="flex gap-2 w-full">
                 <input placeholder="備註..." value={data.note} onChange={e=>setData({...data, note:e.target.value})} className="flex-1 min-w-0 bg-gray-50 p-3 rounded-lg text-sm outline-none text-muji-text placeholder-gray-400"/>
-                <button onClick={handleSaveTemplate} className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 text-gray-400 hover:text-muji-ink hover:bg-gray-200 transition" title="存為樣板">
+                <button type="button" onClick={handleSaveClick} className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 text-gray-400 hover:text-muji-ink hover:bg-gray-200 transition active:scale-90 shadow-sm border border-transparent hover:border-gray-200" title="存為樣板">
                     <Icons.Bookmark size={20} />
                 </button>
             </div>
             
-            <button onClick={handleSubmit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs">{isEditing ? "確認修改" : "儲存紀錄"}</button>
+            <button type="button" onClick={handleSubmit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs active:scale-[0.98]">{isEditing ? "確認修改" : "儲存紀錄"}</button>
         </div>
     );
 };
@@ -191,10 +272,10 @@ export const TeaForm: React.FC<FormProps> = ({ onAdd, onSubmit, records, initial
                 <div className="space-y-1"><label className="text-[10px] text-gray-400 uppercase">店家</label><input list="shops" value={data.shop} onChange={e=>setData({...data, shop:e.target.value})} className="w-full border-b border-gray-200 py-2 outline-none text-sm text-muji-text bg-transparent" placeholder="店家"/><datalist id="shops">{shops.map(s=><option key={s} value={s}/>)}</datalist></div>
                 <div className="space-y-1"><label className="text-[10px] text-gray-400 uppercase">品項</label><input list="items" value={data.item} onChange={e=>setData({...data, item:e.target.value})} className="w-full border-b border-gray-200 py-2 outline-none text-sm text-muji-text bg-transparent" placeholder="品項"/><datalist id="items">{items.map(i=><option key={i} value={i}/>)}</datalist></div>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-2">{['無糖','微糖','半糖','少糖','全糖'].map(s=><button key={s} onClick={()=>setData({...data, sugar:s})} className={`px-3 py-1 text-xs rounded-full border ${data.sugar===s?'border-muji-ink text-muji-ink bg-gray-100':'border-gray-200 text-gray-400'}`}>{s}</button>)}</div>
-            <div className="flex gap-2 overflow-x-auto pb-2">{['熱','去冰','微冰','少冰','正常'].map(i=><button key={i} onClick={()=>setData({...data, ice:i})} className={`px-3 py-1 text-xs rounded-full border ${data.ice===i?'border-muji-ink text-muji-ink bg-gray-100':'border-gray-200 text-gray-400'}`}>{i}</button>)}</div>
+            <div className="flex gap-2 overflow-x-auto pb-2">{['無糖','微糖','半糖','少糖','全糖'].map(s=><button type="button" key={s} onClick={()=>setData({...data, sugar:s})} className={`px-3 py-1 text-xs rounded-full border ${data.sugar===s?'border-muji-ink text-muji-ink bg-gray-100':'border-gray-200 text-gray-400'}`}>{s}</button>)}</div>
+            <div className="flex gap-2 overflow-x-auto pb-2">{['熱','去冰','微冰','少冰','正常'].map(i=><button type="button" key={i} onClick={()=>setData({...data, ice:i})} className={`px-3 py-1 text-xs rounded-full border ${data.ice===i?'border-muji-ink text-muji-ink bg-gray-100':'border-gray-200 text-gray-400'}`}>{i}</button>)}</div>
             <div className="relative border-b border-gray-200"><span className="absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans text-gray-300">$</span><input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className="w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent text-muji-text"/></div>
-            <button onClick={handleSubmit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs">{isEditing ? "確認修改" : "儲存飲料"}</button>
+            <button type="button" onClick={handleSubmit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs active:scale-[0.98]">{isEditing ? "確認修改" : "儲存飲料"}</button>
         </div>
     );
 };
@@ -220,18 +301,18 @@ export const MahjongForm: React.FC<FormProps> = ({ onAdd, onSubmit, records, ini
         <div className="space-y-6">
             <FormDatePicker value={data.date || ''} onChange={e=>setData({...data, date:e.target.value})} />
             <div className="flex bg-gray-100 p-1 rounded-lg">
-                <button onClick={()=>setData({...data, win:true})} className={`flex-1 py-2 text-xs rounded-md transition ${data.win?'bg-white shadow text-muji-red font-bold':'text-gray-400'}`}>贏</button>
-                <button onClick={()=>setData({...data, win:false})} className={`flex-1 py-2 text-xs rounded-md transition ${!data.win?'bg-white shadow text-muji-green font-bold':'text-gray-400'}`}>輸</button>
+                <button type="button" onClick={()=>setData({...data, win:true})} className={`flex-1 py-2 text-xs rounded-md transition ${data.win?'bg-white shadow text-muji-red font-bold':'text-gray-400'}`}>贏</button>
+                <button type="button" onClick={()=>setData({...data, win:false})} className={`flex-1 py-2 text-xs rounded-md transition ${!data.win?'bg-white shadow text-muji-green font-bold':'text-gray-400'}`}>輸</button>
             </div>
             <div>
                 <div className="flex justify-between items-center mb-2"><span className="text-xs uppercase text-gray-400">選擇麻友 ({data.players?.length || 0}/3)</span></div>
                 <div className="flex flex-wrap gap-2">
-                    {players?.map(p => ( <button key={p} onClick={()=>toggle(p)} className={`px-3 py-1 text-xs rounded-full border transition ${data.players?.includes(p)?'bg-muji-ink text-white border-muji-ink':'bg-white text-gray-500 border-gray-200'}`}>{p}</button> ))}
+                    {players?.map(p => ( <button type="button" key={p} onClick={()=>toggle(p)} className={`px-3 py-1 text-xs rounded-full border transition ${data.players?.includes(p)?'bg-muji-ink text-white border-muji-ink':'bg-white text-gray-500 border-gray-200'}`}>{p}</button> ))}
                     {players?.length === 0 && <span className="text-xs text-gray-400">請至設定新增麻友</span>}
                 </div>
             </div>
             <div className="relative border-b border-gray-200"><span className={`absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans ${data.win?'text-muji-red':'text-muji-green'}`}>$</span><input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.win?'text-muji-red':'text-muji-green'}`}/></div>
-            <button onClick={submit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs">{isEditing ? "確認修改" : "儲存戰績"}</button>
+            <button type="button" onClick={submit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs active:scale-[0.98]">{isEditing ? "確認修改" : "儲存戰績"}</button>
         </div>
     );
 };

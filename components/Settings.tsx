@@ -17,6 +17,9 @@ import {
   useSortable 
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Template } from '../types';
+
+const formatMoney = (amount: number) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(amount);
 
 const SettingsItem = ({ icon, label, subLabel, onClick, isDestructive }: any) => (
     <button onClick={onClick} className={`w-full py-4 flex items-center justify-between group transition-colors ${isDestructive ? 'text-muji-red hover:bg-red-50/50 rounded-lg px-2 -mx-2' : 'hover:bg-white/60 rounded-lg px-2 -mx-2'}`}>
@@ -189,4 +192,87 @@ const PlayerSettings = ({ players, onAdd, onRemove, setPlayers, showNotification
     );
 };
 
-export { SettingsItem, CategorySettings, PlayerSettings };
+interface TemplateSettingsProps { 
+    templates: Template[]; 
+    onDelete: (id: string) => void;
+    onRename: (id: string, name: string) => void;
+    showNotification: (m: string, t?: string) => void;
+}
+
+const TemplateSettings = ({ templates, onDelete, onRename, showNotification }: TemplateSettingsProps) => {
+    const [editId, setEditId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+
+    const startEdit = (t: Template) => {
+        setEditId(t.id);
+        setEditName(t.name);
+    };
+
+    const saveEdit = () => {
+        if (editId && editName.trim()) {
+            onRename(editId, editName.trim());
+        }
+        setEditId(null);
+        setEditName('');
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') saveEdit();
+        if (e.key === 'Escape') setEditId(null);
+    };
+
+    return (
+        <div className="space-y-6 animate-fade-in h-full flex flex-col">
+            <div className="px-1 text-xs text-gray-400 text-center">
+                點擊名稱可重新命名
+            </div>
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2">
+                {templates.map(t => (
+                    <div key={t.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between group shadow-sm transition-all hover:border-muji-ink">
+                        {/* Left Side: Category + Name/Edit */}
+                        <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+                            {/* Category Tag */}
+                            <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0 tracking-wide">{t.subCategory}</span>
+                            
+                            {/* Name or Edit Input */}
+                            {editId === t.id ? (
+                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <input 
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        onBlur={saveEdit}
+                                        onKeyDown={handleKeyDown}
+                                        maxLength={10}
+                                        className="w-full text-sm border-b border-muji-ink outline-none py-0.5 text-muji-ink bg-transparent"
+                                        autoFocus
+                                    />
+                                    <button onMouseDown={saveEdit} className="text-muji-ink flex-shrink-0"><Icons.Check size={16}/></button>
+                                </div>
+                            ) : (
+                                <span 
+                                    onClick={() => startEdit(t)} 
+                                    className="text-sm text-muji-text truncate font-medium group-hover:text-muji-ink transition-colors cursor-pointer py-0.5 flex-1"
+                                >
+                                    {t.name}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Right Side: Amount + Delete */}
+                        <div className="flex items-center gap-3 flex-shrink-0 pl-2">
+                            <span className={`text-sm font-bold ${t.type==='expense'?'text-muji-green':'text-muji-red'}`}>{formatMoney(t.amount)}</span>
+                            <button onClick={() => onDelete(t.id)} className="p-1.5 text-gray-200 hover:text-red-400 hover:bg-red-50 rounded-full transition"><Icons.Trash size={16}/></button>
+                        </div>
+                    </div>
+                ))}
+                {templates.length === 0 && (
+                    <div className="text-center py-10 text-gray-300 text-xs tracking-widest">
+                        暫無樣板<br/>請於記帳頁面新增
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export { SettingsItem, CategorySettings, PlayerSettings, TemplateSettings };

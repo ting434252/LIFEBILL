@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AppRecord, CategoryType, TeaRecord, MahjongRecord, DailyRecord } from '../../types';
 import { Icons } from '../Icons';
 import { SummaryCard } from '../ui/UI';
@@ -18,15 +18,21 @@ interface CalendarViewProps {
     onEdit: (record: AppRecord) => void;
     onDuplicate: (id: string) => void;
     category: CategoryType;
+    isSearchMode: boolean;
+    setIsSearchMode: (val: boolean) => void;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, onEdit, onDuplicate, category }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, onEdit, onDuplicate, category, isSearchMode, setIsSearchMode }) => {
     const [viewDate, setViewDate] = useState(new Date());
     const [selDate, setSelDate] = useState(getTodayString());
     const [showPicker, setShowPicker] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSearchMode, setIsSearchMode] = useState(false);
     
+    // Clear search query when search mode is disabled
+    useEffect(() => {
+        if (!isSearchMode) setSearchQuery('');
+    }, [isSearchMode]);
+
     // First filter by category
     const categoryRecords = useMemo(() => records.filter(r => r.category === category), [records, category]);
 
@@ -164,7 +170,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
                                         <span className={`relative z-10 text-[10px] font-medium leading-none ${isSel?'text-muji-ink font-bold':'text-gray-400'}`}>{day}</span>
                                         {info.hasData && (
                                             <div className="flex flex-col items-center gap-0.5 mt-0.5 w-full px-0.5">
-                                                {/* Unified Count Indicators Style - Using Dot+Number for all categories for consistency */}
                                                 <div className="flex items-center justify-center gap-1 h-3">
                                                     {category === 'daily' && (
                                                         <>
@@ -172,12 +177,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
                                                             {info.expCount > 0 && <span className="flex items-center text-[8px] text-muji-green font-bold"><span className="w-1 h-1 rounded-full bg-muji-green mr-0.5"></span>{info.expCount}</span>}
                                                         </>
                                                     )}
-                                                    {/* For Tea and Mahjong, use the same "green dot style" (dot + number) */}
                                                     {category === 'tea' && info.count > 0 && (
-                                                        <span className="flex items-center text-[8px] text-muji-text font-bold"><span className="w-1 h-1 rounded-full bg-muji-kraft mr-0.5"></span>{info.count}</span>
+                                                        <span className="flex items-center justify-center text-[8px] text-white font-bold bg-muji-kraft rounded-full px-1.5 h-3 leading-[12px] scale-90 origin-center whitespace-nowrap">{info.count}杯</span>
                                                     )}
                                                     {category === 'mahjong' && info.count > 0 && (
-                                                        <span className="flex items-center text-[8px] text-muji-text font-bold"><span className="w-1 h-1 rounded-full bg-muji-ink mr-0.5"></span>{info.count}</span>
+                                                        <span className="flex items-center justify-center text-[8px] text-white font-bold bg-muji-ink rounded-full px-1.5 h-3 leading-[12px] scale-90 origin-center whitespace-nowrap">{info.count}將</span>
                                                     )}
                                                 </div>
                                                 <span className={`text-[9px] font-bold tracking-tight leading-none ${info.total >= 0 ? 'text-muji-red' : 'text-muji-green'}`}>{Math.abs(info.total)}</span>

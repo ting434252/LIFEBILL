@@ -84,7 +84,7 @@ export const RatingInput = ({ value = 0, onChange }: { value: number, onChange: 
 export const ConfirmModal = ({ isOpen, message, onConfirm, onCancel, isDestructive }: { isOpen: boolean, message: string, onConfirm: () => void, onCancel: () => void, isDestructive?: boolean }) => {
     if (!isOpen) return null;
     return (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" onClick={onCancel}></div>
             <div className="bg-white rounded-2xl shadow-modal w-full max-w-xs relative z-10 p-6 animate-pop flex flex-col items-center text-center">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${isDestructive ? 'bg-red-50 text-muji-red' : 'bg-gray-50 text-muji-ink'}`}>
