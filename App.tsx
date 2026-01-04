@@ -135,8 +135,17 @@ const App = () => {
 
     const removeCategory = (type: 'expense'|'income', name: string) => {
         if (categories[type].length <= 1) { showNotification("⚠️ 至少保留一個", "error"); return; }
-        setCategories(prev => ({ ...prev, [type]: prev[type].filter(c => c !== name) }));
-        showNotification("已刪除類別", 'delete');
+        
+        setConfirmDialog({
+            isOpen: true,
+            message: `確定要刪除類別「${name}」嗎？`,
+            isDestructive: true,
+            onConfirm: () => {
+                setCategories(prev => ({ ...prev, [type]: prev[type].filter(c => c !== name) }));
+                showNotification("已刪除類別", 'delete');
+                closeConfirm();
+            }
+        });
     };
 
     const addPlayer = (name: string) => {
@@ -147,8 +156,16 @@ const App = () => {
     };
 
     const removePlayer = (name: string) => {
-        setMahjongPlayers(prev => prev.filter(p => p !== name));
-        showNotification("已刪除麻友", 'delete');
+        setConfirmDialog({
+            isOpen: true,
+            message: `確定要刪除麻友「${name}」嗎？`,
+            isDestructive: true,
+            onConfirm: () => {
+                setMahjongPlayers(prev => prev.filter(p => p !== name));
+                showNotification("已刪除麻友", 'delete');
+                closeConfirm();
+            }
+        });
     };
 
     const getNotificationIcon = (type: string) => {
@@ -283,9 +300,9 @@ const App = () => {
                                     <div className="pt-8"><SettingsItem icon={<Icons.Trash size={18}/>} label="清除所有資料" onClick={handleClearAllData} isDestructive/></div>
                                 </div>
                             ) : settingsPage === 'categories' ? (
-                                <CategorySettings categories={categories} onAdd={addCategory} onRemove={removeCategory} setCategories={setCategories} />
+                                <CategorySettings categories={categories} onAdd={addCategory} onRemove={removeCategory} setCategories={setCategories} showNotification={showNotification} />
                             ) : (
-                                <PlayerSettings players={mahjongPlayers} onAdd={addPlayer} onRemove={removePlayer} setPlayers={setMahjongPlayers} />
+                                <PlayerSettings players={mahjongPlayers} onAdd={addPlayer} onRemove={removePlayer} setPlayers={setMahjongPlayers} showNotification={showNotification} />
                             )}
                         </div>
                         <div className="p-6 text-center border-t border-white/50">

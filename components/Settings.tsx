@@ -53,51 +53,24 @@ const SortableItem = ({ id, children, onRemove }: { id: string, children: React.
     );
 };
 
-const SortableGridItem = ({ id, children, onRemove }: { id: string, children: React.ReactNode, onRemove?: () => void }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging
-    } = useSortable({ id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 10 : 1,
-        opacity: isDragging ? 0.8 : 1,
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-manipulation relative">
-            <div className="group relative bg-white border border-gray-100 px-2 py-3 rounded-xl shadow-sm text-center flex flex-col items-center justify-between min-h-[80px] h-full">
-                {children}
-            </div>
-        </div>
-    );
-};
-
-
-const CategorySettings = ({ categories, onAdd, onRemove, setCategories }: any) => {
+const CategorySettings = ({ categories, onAdd, onRemove, setCategories, showNotification }: any) => {
     const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense');
     const [newCat, setNewCat] = useState('');
     
-    // Configure sensors for long press drag
     const sensors = useSensors(
-        useSensor(PointerSensor, {
-             activationConstraint: { delay: 250, tolerance: 5 }, // 250ms long press for mouse/touch
-        }),
-        useSensor(TouchSensor, {
-            activationConstraint: { delay: 250, tolerance: 5 }, // 250ms long press for mobile touch
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
+        useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    const handleAdd = () => { if(newCat.trim()) { onAdd(activeTab, newCat.trim()); setNewCat(''); } };
+    const handleAdd = () => { 
+        if (!newCat.trim()) {
+            showNotification("請輸入類別名稱", "error");
+            return;
+        }
+        onAdd(activeTab, newCat.trim()); 
+        setNewCat(''); 
+    };
     
     const handleDragEnd = (event: any) => {
         const { active, over } = event;
@@ -121,7 +94,7 @@ const CategorySettings = ({ categories, onAdd, onRemove, setCategories }: any) =
             </div>
             <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center gap-2">
                 <input value={newCat} onChange={e=>setNewCat(e.target.value)} onKeyDown={e=> e.key === 'Enter' && handleAdd()} placeholder="輸入新類別..." className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm text-muji-text outline-none placeholder-gray-300"/>
-                <button onClick={handleAdd} disabled={!newCat.trim()} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-muji-paper text-muji-ink rounded-lg hover:bg-muji-ink hover:text-white disabled:opacity-50 transition-all"><Icons.Plus size={20}/></button>
+                <button onClick={handleAdd} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-muji-paper text-muji-ink rounded-lg hover:bg-muji-ink hover:text-white transition-all"><Icons.Plus size={20}/></button>
             </div>
             <div className="flex-1 overflow-y-auto pr-1">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -134,7 +107,7 @@ const CategorySettings = ({ categories, onAdd, onRemove, setCategories }: any) =
                                         <div className="p-2 cursor-move text-gray-300"><Icons.List size={14} className="opacity-50"/></div>
                                         <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
                                         <button 
-                                            onPointerDown={(e) => e.stopPropagation()} // Prevent drag start on button click
+                                            onPointerDown={(e) => e.stopPropagation()} 
                                             onClick={(e)=> {e.stopPropagation(); onRemove(activeTab, cat);}} 
                                             className="w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
                                         >
@@ -152,23 +125,23 @@ const CategorySettings = ({ categories, onAdd, onRemove, setCategories }: any) =
     );
 };
 
-const PlayerSettings = ({ players, onAdd, onRemove, setPlayers }: any) => {
+const PlayerSettings = ({ players, onAdd, onRemove, setPlayers, showNotification }: any) => {
     const [newPlayer, setNewPlayer] = useState('');
     
-    // Configure sensors for long press drag
     const sensors = useSensors(
-        useSensor(PointerSensor, {
-             activationConstraint: { delay: 250, tolerance: 5 },
-        }),
-        useSensor(TouchSensor, {
-            activationConstraint: { delay: 250, tolerance: 5 },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
+        useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
-    const handleAdd = () => { if(newPlayer.trim()) { onAdd(newPlayer.trim()); setNewPlayer(''); } };
+    const handleAdd = () => { 
+        if (!newPlayer.trim()) {
+            showNotification("請輸入麻友名字", "error");
+            return;
+        }
+        onAdd(newPlayer.trim()); 
+        setNewPlayer(''); 
+    };
     
     const handleDragEnd = (event: any) => {
         const { active, over } = event;
@@ -185,25 +158,27 @@ const PlayerSettings = ({ players, onAdd, onRemove, setPlayers }: any) => {
         <div className="space-y-6 animate-fade-in h-full flex flex-col">
             <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center gap-2">
                 <input value={newPlayer} onChange={e=>setNewPlayer(e.target.value)} onKeyDown={e=> e.key === 'Enter' && handleAdd()} placeholder="輸入麻友名字..." className="flex-1 min-w-0 bg-transparent px-3 py-2 text-sm text-muji-text outline-none placeholder-gray-300"/>
-                <button onClick={handleAdd} disabled={!newPlayer.trim()} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-muji-paper text-muji-ink rounded-lg hover:bg-muji-ink hover:text-white disabled:opacity-50 transition-all"><Icons.Plus size={20}/></button>
+                <button onClick={handleAdd} className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-muji-paper text-muji-ink rounded-lg hover:bg-muji-ink hover:text-white transition-all"><Icons.Plus size={20}/></button>
             </div>
             <div className="flex-1 overflow-y-auto pr-1">
                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={players}>
-                        <div className="grid grid-cols-3 gap-2 content-start">
+                    <SortableContext items={players} strategy={verticalListSortingStrategy}>
+                        <div className="flex flex-col gap-2 content-start">
                             {players.map((p: string) => (
-                                <SortableGridItem key={p} id={p}>
-                                    <span className="text-sm text-gray-600 font-medium break-all">{p}</span>
-                                    <div className="flex items-center justify-center gap-1 mt-2 w-full">
+                                <SortableItem key={p} id={p}>
+                                    <span className="text-sm text-gray-600 font-medium">{p}</span>
+                                    <div className="flex items-center gap-1">
+                                        <div className="p-2 cursor-move text-gray-300"><Icons.List size={14} className="opacity-50"/></div>
+                                        <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
                                         <button 
-                                            onPointerDown={(e) => e.stopPropagation()}
+                                            onPointerDown={(e) => e.stopPropagation()} 
                                             onClick={(e)=>{e.stopPropagation(); onRemove(p);}} 
-                                            className="text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-full p-0.5 transition-colors"
+                                            className="w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
                                         >
-                                            <Icons.X size={12}/>
+                                            <Icons.X size={14}/>
                                         </button>
                                     </div>
-                                </SortableGridItem>
+                                </SortableItem>
                             ))}
                         </div>
                     </SortableContext>
