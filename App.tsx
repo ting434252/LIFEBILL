@@ -63,8 +63,10 @@ const App = () => {
 
     // --- Actions ---
     const showNotification = (msg: string, type: 'success' | 'error' | 'add' | 'delete' | 'edit' = 'success') => { 
-        setNotification({ msg, type }); 
-        setTimeout(() => setNotification(null), 2000);
+        // Use 'toast' style for errors, 'modal' for everything else
+        const style = type === 'error' ? 'toast' : 'modal';
+        setNotification({ msg, type, style }); 
+        setTimeout(() => setNotification(null), 1500);
     };
 
     const closeConfirm = () => setConfirmDialog({ ...confirmDialog, isOpen: false });
@@ -151,11 +153,11 @@ const App = () => {
 
     const getNotificationIcon = (type: string) => {
         switch(type) {
-            case 'add': return <Icons.Check size={20} />;
-            case 'edit': return <Icons.Edit size={20} />;
-            case 'delete': return <Icons.Trash size={20} />;
-            case 'error': return <Icons.AlertCircle size={20} />;
-            default: return <Icons.Check size={20} />;
+            case 'add': return <Icons.Check size={32} />;
+            case 'edit': return <Icons.Edit size={32} />;
+            case 'delete': return <Icons.Trash size={32} />;
+            case 'error': return <Icons.AlertCircle size={32} />;
+            default: return <Icons.Check size={32} />;
         }
     };
 
@@ -195,18 +197,31 @@ const App = () => {
                 </div>
             </header>
 
-            {/* Notification Toast (Replaced full-screen Modal) */}
-            {notification && (
-                <div className="absolute top-20 left-0 right-0 z-[100] flex justify-center pointer-events-none animate-slide-up">
-                    <div className="bg-white/95 backdrop-blur shadow-lg border border-gray-100 rounded-full pl-3 pr-6 py-2 flex items-center gap-3 min-w-[150px] max-w-[80%]">
-                        <div className={`p-1.5 rounded-full flex-shrink-0 ${
+            {/* Notification - Modal Style (Success/Add/Edit/Delete) */}
+            {notification && notification.style === 'modal' && (
+                <div className="absolute inset-0 z-[110] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
+                    <div className="relative z-10 bg-white px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center justify-center gap-4 animate-pop min-w-[180px]">
+                        <div className={`p-3 rounded-full ${
                             notification.type === 'add' ? 'bg-[#748E78]/10 text-muji-green' :
-                            (notification.type === 'delete' || notification.type === 'error') ? 'bg-[#C85A5A]/10 text-muji-red' :
+                            (notification.type === 'delete') ? 'bg-[#C85A5A]/10 text-muji-red' :
                             'bg-muji-ink/10 text-muji-ink'
                         }`}>
                             {getNotificationIcon(notification.type)}
                         </div>
-                        <span className="font-medium tracking-wide text-muji-text text-sm">{notification.msg}</span>
+                        <span className="font-bold tracking-widest text-muji-text text-base">{notification.msg}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Notification - Toast Style (Error) */}
+            {notification && notification.style === 'toast' && (
+                 <div className="absolute top-20 left-0 right-0 z-[110] flex justify-center pointer-events-none">
+                    <div className="bg-white px-6 py-3 rounded-2xl shadow-float border border-red-100 flex items-center gap-3 animate-pop pointer-events-auto min-w-[200px] justify-center">
+                        <div className="text-muji-red bg-red-50 p-1 rounded-full flex-shrink-0">
+                            <Icons.AlertCircle size={20} />
+                        </div>
+                        <span className="font-bold text-sm text-muji-text tracking-wide">{notification.msg}</span>
                     </div>
                 </div>
             )}

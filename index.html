@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tina Journal</title>
+    
+    <!-- App Icons & Manifest -->
+    <link rel="icon" type="image/svg+xml" href="./icon.svg">
+    <link rel="apple-touch-icon" href="./icon.svg">
+    <link rel="manifest" href="./manifest.json">
+    
+    <!-- Theme Color for Mobile Browsers -->
+    <meta name="theme-color" content="#BBADA2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -96,16 +107,6 @@
 </head>
 <body>
     <div id="root"></div>
-    <!-- Half star gradient definition -->
-    <svg width="0" height="0" class="absolute">
-        <defs>
-        <linearGradient id="half-ink" x1="0" x2="100%" y1="0" y2="0">
-            <stop offset="50%" stopColor="#BBADA2" />
-            <stop offset="50%" stopColor="transparent" />
-        </linearGradient>
-        </defs>
-    </svg>
-    
     <!-- 這裡是指向您的程式碼入口，Vite 會從這裡開始打包 -->
     <script type="module" src="./index.tsx"></script>
 </body>

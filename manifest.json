@@ -1,0 +1,15 @@
+{
+  "name": "Tina Journal",
+  "short_name": "Tina",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F4F3F0",
+  "theme_color": "#BBADA2",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

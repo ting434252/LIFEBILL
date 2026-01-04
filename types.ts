@@ -49,4 +49,5 @@ export interface ConfirmDialogState {
 export interface NotificationState {
     msg: string;
     type: 'success' | 'error' | 'add' | 'delete' | 'edit';
+    style: 'modal' | 'toast';
 }
