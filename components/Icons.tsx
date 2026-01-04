@@ -66,5 +66,10 @@ export const Icons = {
     Edit: (props: IconProps) => <IconWrapper {...props}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></IconWrapper>,
     Users: (props: IconProps) => <IconWrapper {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></IconWrapper>,
     ArrowUp: (props: IconProps) => <IconWrapper {...props}><path d="m18 15-6-6-6 6"/><path d="M12 9v12"/></IconWrapper>,
-    ArrowDown: (props: IconProps) => <IconWrapper {...props}><path d="m6 9 6 6 6-6"/><path d="M12 3v12"/></IconWrapper>
+    ArrowDown: (props: IconProps) => <IconWrapper {...props}><path d="m6 9 6 6 6-6"/><path d="M12 3v12"/></IconWrapper>,
+    Search: (props: IconProps) => <IconWrapper {...props}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></IconWrapper>,
+    Bookmark: (props: IconProps) => <IconWrapper {...props}><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></IconWrapper>,
+    UploadCloud: (props: IconProps) => <IconWrapper {...props}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></IconWrapper>,
+    DownloadCloud: (props: IconProps) => <IconWrapper {...props}><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></IconWrapper>,
+    Copy: (props: IconProps) => <IconWrapper {...props}><rect width="13" height="13" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></IconWrapper>
 };

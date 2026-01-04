@@ -105,6 +105,7 @@ export const ConfirmModal = ({ isOpen, message, onConfirm, onCancel, isDestructi
 export const SummaryCard = ({ category, records }: { category: CategoryType, records: AppRecord[] }) => {
     const currentMonth = new Date().getMonth();
     const monthly = records.filter(r => new Date(r.date).getMonth() === currentMonth);
+    // Removed pr-12 as icon is no longer inside absolute
     const cardClass = "bg-muji-ink text-white p-4 rounded-2xl shadow-float relative overflow-hidden transition-colors duration-300";
     const Decor = () => <div className="absolute right-0 top-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 pointer-events-none"/>;
 

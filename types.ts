@@ -1,3 +1,4 @@
+
 export type CategoryType = 'daily' | 'tea' | 'mahjong';
 export type RecordType = 'income' | 'expense';
 
@@ -39,6 +40,15 @@ export interface CategoryConfig {
     income: string[];
 }
 
+export interface Template {
+    id: string;
+    name: string;
+    type: RecordType;
+    subCategory: string;
+    amount: number;
+    note: string;
+}
+
 export interface ConfirmDialogState {
     isOpen: boolean;
     message: string;
@@ -48,6 +58,6 @@ export interface ConfirmDialogState {
 
 export interface NotificationState {
     msg: string;
-    type: 'success' | 'error' | 'add' | 'delete' | 'edit';
+    type: 'success' | 'error' | 'add' | 'delete' | 'edit' | 'backup';
     style: 'modal' | 'toast';
 }

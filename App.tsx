@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Icons, AppLogo } from './components/Icons';
 import { DailyForm, TeaForm, MahjongForm } from './components/Forms';
 import { CalendarView } from './components/views/CalendarView';
@@ -20,6 +20,7 @@ const App = () => {
     const [notification, setNotification] = useState<NotificationState | null>(null); 
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, message: '', onConfirm: null, isDestructive: false });
     const [editingRecord, setEditingRecord] = useState<AppRecord | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // NOTE: Keep internal storage keys as 'tina_journal' to preserve user data
     const [categories, setCategories] = useState<CategoryConfig>({
@@ -63,7 +64,7 @@ const App = () => {
     }, 0), [records]);
 
     // --- Actions ---
-    const showNotification = (msg: string, type: 'success' | 'error' | 'add' | 'delete' | 'edit' = 'success') => { 
+    const showNotification = (msg: string, type: 'success' | 'error' | 'add' | 'delete' | 'edit' | 'backup' = 'success') => { 
         // Use 'toast' style for errors, 'modal' for everything else
         const style = type === 'error' ? 'toast' : 'modal';
         setNotification({ msg, type, style }); 
@@ -84,6 +85,15 @@ const App = () => {
         setRecords(prev => prev.map(r => r.id === editingRecord.id ? updatedRecord : r));
         setEditingRecord(null);
         showNotification("修改成功！", 'edit');
+    };
+
+    const handleDuplicateRecord = (id: string) => {
+        const record = records.find(r => r.id === id);
+        if (record) {
+            const newRecord = { ...record, id: Date.now().toString(), createdAt: new Date().toISOString() };
+            setRecords(prev => [...prev, newRecord]);
+            showNotification("已複製紀錄", 'add');
+        }
     };
 
     const handleDelete = (id: string) => {
@@ -112,6 +122,65 @@ const App = () => {
                 closeConfirm();
             }
         });
+    };
+
+    // --- JSON Backup & Restore ---
+    const handleExportJSON = () => {
+        const data = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            year: year,
+            categories,
+            players: mahjongPlayers,
+            records,
+            templates: JSON.parse(localStorage.getItem('tina_journal_templates') || '[]')
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `life_journal_backup_${year}_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotification("備份檔案已下載", 'backup');
+    };
+
+    const handleImportClick = () => fileInputRef.current?.click();
+
+    const handleImportJSON = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target?.result as string);
+                if (!data.version || !data.records) throw new Error("無效的備份檔案格式");
+                
+                setConfirmDialog({
+                    isOpen: true,
+                    message: `確定要還原 ${data.records.length} 筆資料嗎？目前的資料將會被覆蓋！`,
+                    isDestructive: true,
+                    onConfirm: () => {
+                        // Restore Logic
+                        if (data.categories) setCategories(data.categories);
+                        if (data.players) setMahjongPlayers(data.players);
+                        if (data.records) setRecords(data.records);
+                        if (data.templates) localStorage.setItem('tina_journal_templates', JSON.stringify(data.templates));
+                        
+                        showNotification("資料還原成功！", 'success');
+                        closeConfirm();
+                        setShowSettings(false);
+                    }
+                });
+            } catch (err) {
+                showNotification("檔案讀取失敗", 'error');
+            }
+        };
+        reader.readAsText(file);
+        // Reset input
+        event.target.value = '';
     };
 
     const exportToExcel = () => {
@@ -175,6 +244,7 @@ const App = () => {
             case 'edit': return <Icons.Edit size={32} />;
             case 'delete': return <Icons.Trash size={32} />;
             case 'error': return <Icons.AlertCircle size={32} />;
+            case 'backup': return <Icons.DownloadCloud size={32} />;
             default: return <Icons.Check size={32} />;
         }
     };
@@ -187,8 +257,12 @@ const App = () => {
         </div>
     );
 
-    const NavBtn = ({ active, onClick, icon, label }: any) => (
-        <button onClick={onClick} className={`flex-1 flex flex-col items-center justify-center py-2 transition-all duration-300 group`}><div className={`p-1.5 rounded-xl transition-all duration-300 ${active ? 'text-muji-ink bg-muji-ink/10' : 'text-gray-400 group-hover:text-muji-ink'}`}>{icon}</div><span className={`text-[10px] tracking-widest font-sans font-medium mt-1 ${active ? 'text-muji-ink' : 'text-gray-400'}`}>{label}</span></button>
+    const NavBtn = ({ active, onClick, icon }: any) => (
+        <button onClick={onClick} className={`flex-1 flex flex-col items-center justify-center py-4 transition-all duration-300 group`}>
+            <div className={`p-2 rounded-xl transition-all duration-300 ${active ? 'text-muji-ink bg-muji-ink/10' : 'text-gray-400 group-hover:text-muji-ink'}`}>
+                {React.cloneElement(icon, { size: 26 })}
+            </div>
+        </button>
     );
 
     return (
@@ -223,6 +297,7 @@ const App = () => {
                         <div className={`p-3 rounded-full ${
                             notification.type === 'add' ? 'bg-[#748E78]/10 text-muji-green' :
                             (notification.type === 'delete') ? 'bg-[#C85A5A]/10 text-muji-red' :
+                            (notification.type === 'backup') ? 'bg-blue-50 text-blue-500' :
                             'bg-muji-ink/10 text-muji-ink'
                         }`}>
                             {getNotificationIcon(notification.type)}
@@ -295,8 +370,13 @@ const App = () => {
                                             <SettingsItem icon={<Icons.List size={18}/>} label="類別管理" onClick={()=>setSettingsPage('categories')} subLabel="自訂收支項目"/>
                                             <SettingsItem icon={<Icons.Users size={18}/>} label="麻友管理" onClick={()=>setSettingsPage('players')} subLabel="設定牌咖名單"/>
                                             <div className="h-[1px] bg-gray-200 ml-10 my-1"></div>
-                                            <SettingsItem icon={<Icons.Download size={18}/>} label="匯出資料" onClick={exportToExcel} subLabel="下載 CSV 報表"/>
+                                            <SettingsItem icon={<Icons.DownloadCloud size={18}/>} label="備份資料 (JSON)" onClick={handleExportJSON} subLabel="下載完整備份檔"/>
+                                            <SettingsItem icon={<Icons.UploadCloud size={18}/>} label="還原資料" onClick={handleImportClick} subLabel="匯入備份檔"/>
+                                            <div className="h-[1px] bg-gray-200 ml-10 my-1"></div>
+                                            <SettingsItem icon={<Icons.Download size={18}/>} label="匯出報表" onClick={exportToExcel} subLabel="下載 CSV Excel"/>
                                         </div>
+                                        {/* Hidden File Input for Restore */}
+                                        <input type="file" ref={fileInputRef} onChange={handleImportJSON} accept=".json" className="hidden" />
                                     </div>
                                     <div className="pt-8"><SettingsItem icon={<Icons.Trash size={18}/>} label="清除所有資料" onClick={handleClearAllData} isDestructive/></div>
                                 </div>
@@ -308,7 +388,7 @@ const App = () => {
                         </div>
                         <div className="p-6 text-center border-t border-white/50">
                             <p className="text-[10px] text-gray-400 font-sans tracking-widest uppercase">
-                                Life Journal {year} • V1.0 <br/> Local Storage
+                                Life Journal {year} • V1.1 <br/> Local Storage
                             </p>
                         </div>
                     </div>
@@ -327,7 +407,7 @@ const App = () => {
                             </div>
                         </div>
                     )}
-                    {currentTab === 'calendar' && <CalendarView records={records} onDelete={handleDelete} onEdit={setEditingRecord} category={currentCategory} />}
+                    {currentTab === 'calendar' && <CalendarView records={records} onDelete={handleDelete} onEdit={setEditingRecord} onDuplicate={handleDuplicateRecord} category={currentCategory} />}
                     {currentTab === 'stats' && <StatsView records={records} category={currentCategory} categories={categories} />}
                 </div>
             </main>
@@ -336,9 +416,9 @@ const App = () => {
             <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto">
                 <div className="px-4 pb-2"><CategoryTabs current={currentCategory} set={setCurrentCategory} /></div>
                 <nav className="bg-white shadow-nav flex justify-around items-center pb-safe pt-2 border-t border-gray-100">
-                    <NavBtn active={currentTab === 'calendar'} onClick={() => setCurrentTab('calendar')} icon={<Icons.Calendar size={22} />} label="日曆" />
-                    <NavBtn active={currentTab === 'add'} onClick={() => setCurrentTab('add')} icon={<Icons.Plus size={24} />} label="新增" />
-                    <NavBtn active={currentTab === 'stats'} onClick={() => setCurrentTab('stats')} icon={<Icons.PieChart size={22} />} label="數據" />
+                    <NavBtn active={currentTab === 'calendar'} onClick={() => setCurrentTab('calendar')} icon={<Icons.Calendar />} />
+                    <NavBtn active={currentTab === 'add'} onClick={() => setCurrentTab('add')} icon={<Icons.Plus />} />
+                    <NavBtn active={currentTab === 'stats'} onClick={() => setCurrentTab('stats')} icon={<Icons.PieChart />} />
                 </nav>
             </div>
         </div>

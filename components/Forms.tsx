@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FormDatePicker, RatingInput } from './ui/UI';
 import { Icons } from './Icons';
-import { CategoryConfig, AppRecord, DailyRecord, TeaRecord, MahjongRecord } from '../types';
+import { CategoryConfig, AppRecord, DailyRecord, TeaRecord, MahjongRecord, Template } from '../types';
 
 const getTodayString = () => {
     const d = new Date();
@@ -28,6 +28,15 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
         return { date: getTodayString(), type: 'expense', sub: '餐飲', amt: '', note: '' };
     });
     
+    // Templates State
+    const [templates, setTemplates] = useState<Template[]>([]);
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+    useEffect(() => {
+        const saved = localStorage.getItem('tina_journal_templates');
+        if (saved) try { setTemplates(JSON.parse(saved)); } catch {}
+    }, []);
+
     // Default to first category if current doesn't exist in new type
     const cats = data.type === 'expense' ? categories?.expense : categories?.income;
     useEffect(() => { 
@@ -42,21 +51,115 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
         if (isEditing && onSubmit) onSubmit(payload); 
         else if (onAdd) { onAdd(payload); setData({...data, amt: '', note: ''}); }
     };
+
+    const handleSaveTemplate = () => {
+        if(!data.amt || Number(data.amt) <= 0) return showNotification("請先輸入金額與項目", "error");
+        const newTemplate: Template = {
+            id: Date.now().toString(),
+            name: data.note || data.sub,
+            type: data.type as 'income'|'expense',
+            subCategory: data.sub,
+            amount: Number(data.amt),
+            note: data.note || ''
+        };
+        const updated = [...templates, newTemplate];
+        setTemplates(updated);
+        localStorage.setItem('tina_journal_templates', JSON.stringify(updated));
+        showNotification("已儲存為快速樣板", "success");
+    };
+
+    const handleApplyTemplate = (t: Template) => {
+        setData(prev => ({
+            ...prev,
+            type: t.type,
+            sub: t.subCategory,
+            amt: String(t.amount),
+            note: t.note
+        }));
+        setShowTemplateModal(false);
+    };
+
+    const handleDeleteTemplate = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if(window.confirm('確定刪除此樣板？')) {
+            const updated = templates.filter(t => t.id !== id);
+            setTemplates(updated);
+            localStorage.setItem('tina_journal_templates', JSON.stringify(updated));
+        }
+    };
     
     return (
-        <div className="space-y-6">
-            <div className="flex border-b border-gray-100 pb-4">
-                <button onClick={()=>setData({...data, type:'expense'})} className={`flex-1 pb-2 text-sm tracking-widest transition border-b-2 ${data.type==='expense' ? 'border-muji-green text-muji-green font-bold' : 'border-transparent text-gray-400'}`}>支出</button>
-                <button onClick={()=>setData({...data, type:'income'})} className={`flex-1 pb-2 text-sm tracking-widest transition border-b-2 ${data.type==='income' ? 'border-muji-red text-muji-red font-bold' : 'border-transparent text-gray-400'}`}>收入</button>
+        <div className="space-y-5">
+            {/* Type Selection: Big Buttons */}
+            <div className="flex gap-3">
+                <button onClick={()=>setData({...data, type:'expense'})} className={`flex-1 py-3 rounded-xl text-sm font-bold tracking-widest transition-all shadow-sm ${data.type==='expense' ? 'bg-muji-green text-white transform scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>支出</button>
+                <button onClick={()=>setData({...data, type:'income'})} className={`flex-1 py-3 rounded-xl text-sm font-bold tracking-widest transition-all shadow-sm ${data.type==='income' ? 'bg-muji-red text-white transform scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>收入</button>
             </div>
-            <FormDatePicker value={data.date || ''} onChange={e=>setData({...data, date:e.target.value})} />
+
+            {/* Template Modal */}
+            {showTemplateModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 animate-fade-in">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" onClick={()=>setShowTemplateModal(false)}></div>
+                    <div className="bg-muji-paper w-full max-w-[300px] rounded-3xl shadow-2xl flex flex-col animate-pop relative z-10 max-h-[60vh]">
+                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-3xl sticky top-0 z-10">
+                            <h3 className="font-bold text-muji-text text-sm tracking-wide">選擇快速樣板</h3>
+                            <button onClick={()=>setShowTemplateModal(false)}><Icons.X size={18} className="text-gray-400"/></button>
+                        </div>
+                        <div className="overflow-y-auto p-3 space-y-2 hide-scrollbar">
+                            {templates.length === 0 ? (
+                                <div className="text-center py-8 px-4">
+                                    <div className="bg-gray-100 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 text-gray-300"><Icons.Bookmark size={18}/></div>
+                                    <p className="text-xs text-gray-400">尚無樣板</p>
+                                    <p className="text-[10px] text-gray-300 mt-1">輸入金額與備註後<br/>點擊書籤按鈕即可新增</p>
+                                </div>
+                            ) : (
+                                templates.map(t => (
+                                    <div key={t.id} onClick={() => handleApplyTemplate(t)} className="bg-white p-3 rounded-xl border border-gray-100 flex justify-between items-center hover:border-muji-ink transition cursor-pointer active:scale-95 duration-200">
+                                        <div className="flex-1 min-w-0 pr-2">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`text-sm font-bold ${t.type==='expense'?'text-muji-green':'text-muji-red'}`}>${t.amount}</span>
+                                                <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{t.subCategory}</span>
+                                            </div>
+                                            <span className="text-xs text-gray-400 block truncate">{t.name}</span>
+                                        </div>
+                                        <button onClick={(e) => handleDeleteTemplate(e, t.id)} className="p-2 text-gray-200 hover:text-red-400 hover:bg-red-50 rounded-full transition"><Icons.Trash size={16}/></button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Date + Template Button Row */}
+            <div className="flex items-center gap-3">
+                <div className="flex-1">
+                    <FormDatePicker value={data.date || ''} onChange={e=>setData({...data, date:e.target.value})} />
+                </div>
+                <button onClick={() => setShowTemplateModal(true)} className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gray-50 text-gray-400 hover:text-muji-ink hover:bg-gray-100 transition border border-transparent hover:border-gray-200">
+                    <Icons.List size={16} />
+                    <span className="text-xs">樣板 ({templates.length})</span>
+                </button>
+            </div>
+
             <div className="grid grid-cols-5 gap-2">
                 {cats && cats.length > 0 ? cats.map(c => (
                     <button key={c} onClick={()=>setData({...data, sub:c})} className={`py-2 text-xs rounded-lg transition-all w-full truncate ${data.sub===c ? 'bg-muji-ink text-white' : 'bg-gray-100 text-gray-500'}`} title={c}>{c}</button>
                 )) : <span className="text-xs text-gray-400 col-span-5 text-center">請至設定新增類別</span>}
             </div>
-            <div className="relative border-b border-gray-200"><span className={`absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}>$</span><input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}/></div>
-            <input placeholder="備註..." value={data.note} onChange={e=>setData({...data, note:e.target.value})} className="w-full bg-gray-50 p-3 rounded-lg text-sm outline-none text-muji-text placeholder-gray-400"/>
+            
+            <div className="relative border-b border-gray-200 group">
+                <span className={`absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}>$</span>
+                <input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}/>
+            </div>
+            
+            <div className="flex gap-2">
+                <input placeholder="備註..." value={data.note} onChange={e=>setData({...data, note:e.target.value})} className="flex-1 bg-gray-50 p-3 rounded-lg text-sm outline-none text-muji-text placeholder-gray-400"/>
+                <button onClick={handleSaveTemplate} className="p-3 rounded-lg bg-gray-100 text-gray-400 hover:text-muji-ink hover:bg-gray-200 transition" title="存為樣板">
+                    <Icons.Bookmark size={20} />
+                </button>
+            </div>
+            
             <button onClick={handleSubmit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs">{isEditing ? "確認修改" : "儲存紀錄"}</button>
         </div>
     );
