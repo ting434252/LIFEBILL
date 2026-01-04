@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>產生 PNG 圖示</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f0f0f0; }
+        canvas { box-shadow: 0 10px 20px rgba(0,0,0,0.1); border-radius: 20px; margin: 20px; }
+        p { color: #666; max-width: 400px; text-align: center; }
+        button { padding: 10px 20px; font-size: 16px; background: #333; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>圖示轉換器</h2>
+    <p>如果沒有自動下載，請點擊下方按鈕，或右鍵點擊圖片選擇「另存圖片」並命名為 <b>icon.png</b></p>
+    <canvas id="canvas" width="512" height="512"></canvas>
+    <br>
+    <button onclick="downloadIcon()">下載 icon.png</button>
+
+    <script>
+        // 這是您目前的 icon.svg 內容
+        const svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+          <rect width="512" height="512" rx="100" fill="#BBADA2"/>
+          <g transform="translate(56, 56) scale(10)">
+            <rect x="8" y="6" width="24" height="28" rx="3" stroke="#FFFFFF" stroke-width="2.5" fill="none"/>
+            <path d="M13 6V34" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.5"/>
+            <path d="M18 16H28" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M23 16V24" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="28" cy="28" r="3" fill="#C85A5A" stroke="none" />
+          </g>
+        </svg>`;
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+
+        // 使用 Base64 編碼載入 SVG
+        img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+
+        img.onload = () => {
+            // 清除並繪製
+            ctx.clearRect(0, 0, 512, 512);
+            ctx.drawImage(img, 0, 0);
+            
+            // 自動嘗試下載
+            setTimeout(downloadIcon, 500);
+        };
+
+        function downloadIcon() {
+            const link = document.createElement('a');
+            link.download = 'icon.png';
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
