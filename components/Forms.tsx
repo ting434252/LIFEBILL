@@ -13,6 +13,23 @@ const getTodayString = () => {
 
 const formatMoney = (amount: number) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(amount);
 
+// Helper to handle input with commas
+const formatNumberString = (val: string) => {
+    // Remove existing commas
+    const raw = val.replace(/,/g, '');
+    if (raw === '') return '';
+    if (isNaN(Number(raw))) return val; // Fallback if invalid
+    
+    // Split integer and decimal to preserve trailing dot or decimal zeros
+    const parts = raw.split('.');
+    parts[0] = Number(parts[0]).toLocaleString('en-US');
+    return parts.join('.');
+};
+
+const parseNumberString = (val: string) => {
+    return Number(val.replace(/,/g, ''));
+};
+
 interface FormProps {
     onAdd?: (record: any) => void;
     onSubmit?: (record: any) => void;
@@ -29,7 +46,7 @@ interface FormProps {
 
 export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, initialData, isEditing, showNotification, templates = [], setTemplates, onDeleteTemplate }) => {
     const [data, setData] = useState<Partial<DailyRecord> & { sub: string, amt: string }>(() => {
-        if (initialData) return { date: initialData.date, type: initialData.type, sub: initialData.subCategory, amt: String(initialData.amount), note: initialData.note || '' };
+        if (initialData) return { date: initialData.date, type: initialData.type, sub: initialData.subCategory, amt: formatNumberString(String(initialData.amount)), note: initialData.note || '' };
         return { date: getTodayString(), type: 'expense', sub: '餐飲', amt: '', note: '' };
     });
     
@@ -46,51 +63,78 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
         }
     }, [data.type, cats, isEditing]);
 
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        // Allow digits, dots, and commas. If invalid char, ignore.
+        // Also ensure only one dot.
+        const raw = val.replace(/,/g, '');
+        if (raw === '' || (!isNaN(Number(raw)) && !/\s/.test(raw))) {
+            setData({ ...data, amt: formatNumberString(raw) });
+        }
+    };
+
     const handleSubmit = () => {
-        if(!data.amt || Number(data.amt) <= 0) return showNotification("請輸入有效金額", "error");
-        const payload = { category: 'daily', date: data.date, type: data.type, subCategory: data.sub, amount: Number(data.amt), note: data.note };
+        const numAmt = parseNumberString(data.amt);
+        if(!data.amt || numAmt <= 0) return showNotification("請輸入有效金額", "error");
+        const payload = { category: 'daily', date: data.date, type: data.type, subCategory: data.sub, amount: numAmt, note: data.note };
         if (isEditing && onSubmit) onSubmit(payload); 
         else if (onAdd) { onAdd(payload); setData({...data, amt: '', note: ''}); }
     };
 
     const handleSaveClick = () => {
-        if(!data.amt || Number(data.amt) <= 0) {
+        const numAmt = parseNumberString(data.amt);
+        if(!data.amt || numAmt <= 0) {
             showNotification("請先輸入金額與項目", "error");
             return;
         }
         
         const noteToSave = data.note ? data.note.trim() : '';
-        
-        // Duplicate Check
+        const defaultName = noteToSave || data.sub;
+
+        // Duplicate Check (Early check)
+        // logic: match (type, sub, amount) AND (note == existing.note OR note == existing.name)
+        // The second condition handles cases where template was applied (Name -> Note) and saved again.
         const isDuplicate = templates.some(t => 
             t.type === data.type &&
             t.subCategory === data.sub &&
-            t.amount === Number(data.amt) &&
-            t.note === noteToSave
+            t.amount === numAmt &&
+            ((t.note || '').trim() === noteToSave || t.name === noteToSave)
         );
 
         if (isDuplicate) {
-            showNotification("已有相同樣板", "error");
+            showNotification("已有相同內容的樣板", "error");
             return;
         }
 
-        // Pre-fill Logic: If note exists, use note. Else use Category.
-        const defaultName = noteToSave || data.sub;
         setTemplateNameInput(defaultName);
         setShowSaveModal(true);
     };
 
     const confirmSaveTemplate = () => {
+        const numAmt = parseNumberString(data.amt);
         const noteToSave = data.note ? data.note.trim() : '';
         const defaultName = noteToSave || data.sub;
         const finalName = templateNameInput.trim() || defaultName;
+
+        // Duplicate Check (Strict check before final save)
+        const isDuplicate = templates.some(t => 
+            t.type === data.type &&
+            t.subCategory === data.sub &&
+            t.amount === numAmt &&
+            ((t.note || '').trim() === noteToSave || t.name === noteToSave)
+        );
+
+        if (isDuplicate) {
+            showNotification("已有相同內容的樣板", "error");
+            return;
+        }
 
         const newTemplate: Template = {
             id: Date.now().toString(),
             name: finalName,
             type: data.type as 'income'|'expense',
             subCategory: data.sub,
-            amount: Number(data.amt),
+            amount: numAmt,
             note: noteToSave
         };
         
@@ -105,7 +149,7 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
             ...prev,
             type: t.type,
             sub: t.subCategory,
-            amt: String(t.amount),
+            amt: formatNumberString(String(t.amount)),
             note: t.name // Use template Name as Note
         }));
         setShowTemplateList(false);
@@ -116,7 +160,6 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
         if (onDeleteTemplate) {
             onDeleteTemplate(id);
         } else {
-            // Fallback if not passed
              if(window.confirm('確定刪除此樣板？')) {
                 const updated = templates.filter(t => t.id !== id);
                 if (setTemplates) setTemplates(updated);
@@ -196,7 +239,7 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
                                 
                                 {/* Amount */}
                                 <span className={`text-sm font-bold ${data.type==='expense'?'text-muji-green':'text-muji-red'}`}>
-                                    {formatMoney(Number(data.amt))}
+                                    {formatMoney(parseNumberString(data.amt))}
                                 </span>
                              </div>
                              <p className="text-[10px] text-gray-300 text-center mt-1">
@@ -231,7 +274,14 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
             
             <div className="relative border-b border-gray-200 group">
                 <span className={`absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}>$</span>
-                <input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}/>
+                <input 
+                    type="text" 
+                    inputMode="decimal"
+                    placeholder="0" 
+                    value={data.amt} 
+                    onChange={handleAmountChange}
+                    className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.type === 'expense' ? 'text-muji-green' : 'text-muji-red'}`}
+                />
             </div>
             
             <div className="flex gap-2 w-full">
@@ -248,20 +298,29 @@ export const DailyForm: React.FC<FormProps> = ({ onAdd, onSubmit, categories, in
 
 export const TeaForm: React.FC<FormProps> = ({ onAdd, onSubmit, records, initialData, isEditing, showNotification }) => {
     const [data, setData] = useState<Partial<TeaRecord> & { amt: string }>(() => {
-        if (initialData) return { date: initialData.date, shop: initialData.shop, item: initialData.item, sugar: initialData.sugar, ice: initialData.ice, amt: String(initialData.amount), rating: initialData.rating || 0 };
+        if (initialData) return { date: initialData.date, shop: initialData.shop, item: initialData.item, sugar: initialData.sugar, ice: initialData.ice, amt: formatNumberString(String(initialData.amount)), rating: initialData.rating || 0 };
         return { date: getTodayString(), shop: '', item: '', sugar: '半糖', ice: '少冰', amt: '', rating: 0 };
     });
-    useEffect(() => { if (initialData) setData({ ...initialData, amt: String(initialData.amount), rating: initialData.rating || 0 }); }, [initialData]);
+    useEffect(() => { if (initialData) setData({ ...initialData, amt: formatNumberString(String(initialData.amount)), rating: initialData.rating || 0 }); }, [initialData]);
     
     const shops = useMemo(() => [...new Set(records?.filter(r=>r.category==='tea').map(r=>(r as TeaRecord).shop))], [records]);
     const items = useMemo(() => [...new Set(records?.filter(r=>r.category==='tea' && (r as TeaRecord).shop===data.shop).map(r=>(r as TeaRecord).item))], [records, data.shop]);
+
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        const raw = val.replace(/,/g, '');
+        if (raw === '' || (!isNaN(Number(raw)) && !/\s/.test(raw))) {
+            setData({ ...data, amt: formatNumberString(raw) });
+        }
+    };
     
     const handleSubmit = () => {
+        const numAmt = parseNumberString(data.amt);
         if(!data.shop) return showNotification("請輸入店家名稱", "error");
         if(!data.item) return showNotification("請輸入品項名稱", "error");
         if(!data.rating || data.rating === 0) return showNotification("請給予評分", "error");
-        if(!data.amt || Number(data.amt) <= 0) return showNotification("請輸入有效金額", "error");
-        const payload = { category: 'tea', ...data, amount: Number(data.amt) };
+        if(!data.amt || numAmt <= 0) return showNotification("請輸入有效金額", "error");
+        const payload = { category: 'tea', ...data, amount: numAmt };
         if (isEditing && onSubmit) onSubmit(payload);
         else if (onAdd) { onAdd(payload); setData({...data, amt: '', shop: '', item: '', rating: 0}); }
     };
@@ -274,7 +333,16 @@ export const TeaForm: React.FC<FormProps> = ({ onAdd, onSubmit, records, initial
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2">{['無糖','微糖','半糖','少糖','全糖'].map(s=><button type="button" key={s} onClick={()=>setData({...data, sugar:s})} className={`px-3 py-1 text-xs rounded-full border ${data.sugar===s?'border-muji-ink text-muji-ink bg-gray-100':'border-gray-200 text-gray-400'}`}>{s}</button>)}</div>
             <div className="flex gap-2 overflow-x-auto pb-2">{['熱','去冰','微冰','少冰','正常'].map(i=><button type="button" key={i} onClick={()=>setData({...data, ice:i})} className={`px-3 py-1 text-xs rounded-full border ${data.ice===i?'border-muji-ink text-muji-ink bg-gray-100':'border-gray-200 text-gray-400'}`}>{i}</button>)}</div>
-            <div className="relative border-b border-gray-200"><span className="absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans text-gray-300">$</span><input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className="w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent text-muji-text"/></div>
+            <div className="relative border-b border-gray-200"><span className="absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans text-gray-300">$</span>
+                <input 
+                    type="text" 
+                    inputMode="decimal"
+                    placeholder="0" 
+                    value={data.amt} 
+                    onChange={handleAmountChange}
+                    className="w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent text-muji-text"
+                />
+            </div>
             <button type="button" onClick={handleSubmit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs active:scale-[0.98]">{isEditing ? "確認修改" : "儲存飲料"}</button>
         </div>
     );
@@ -282,19 +350,29 @@ export const TeaForm: React.FC<FormProps> = ({ onAdd, onSubmit, records, initial
 
 export const MahjongForm: React.FC<FormProps> = ({ onAdd, onSubmit, records, initialData, isEditing, showNotification, players }) => {
     const [data, setData] = useState<Partial<MahjongRecord> & { win: boolean, amt: string }>(() => {
-        if (initialData) return { date: initialData.date, players: initialData.players || [], win: initialData.isWin, amt: String(initialData.amount) };
+        if (initialData) return { date: initialData.date, players: initialData.players || [], win: initialData.isWin, amt: formatNumberString(String(initialData.amount)) };
         return { date: getTodayString(), players: [], win: true, amt: '' };
     });
-    useEffect(() => { if (initialData) setData({ date: initialData.date, players: initialData.players, win: initialData.isWin, amt: String(initialData.amount) }); }, [initialData]);
+    useEffect(() => { if (initialData) setData({ date: initialData.date, players: initialData.players, win: initialData.isWin, amt: formatNumberString(String(initialData.amount)) }); }, [initialData]);
     
     const toggle = (p: string) => { 
         if (data.players?.includes(p)) setData({...data, players: data.players.filter(x=>x!==p)}); 
         else if ((data.players?.length || 0) < 3) setData({...data, players: [...(data.players || []), p]}); 
     };
+
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        const raw = val.replace(/,/g, '');
+        if (raw === '' || (!isNaN(Number(raw)) && !/\s/.test(raw))) {
+            setData({ ...data, amt: formatNumberString(raw) });
+        }
+    };
+
     const submit = () => { 
+        const numAmt = parseNumberString(data.amt);
         if((data.players?.length || 0) !== 3) return showNotification("麻友請選擇 3 位", "error");
-        if(!data.amt || Number(data.amt) <= 0) return showNotification("請輸入有效金額", "error");
-        const payload = { category: 'mahjong', date: data.date, players: data.players, isWin: data.win, amount: Number(data.amt) }; 
+        if(!data.amt || numAmt <= 0) return showNotification("請輸入有效金額", "error");
+        const payload = { category: 'mahjong', date: data.date, players: data.players, isWin: data.win, amount: numAmt }; 
         if (isEditing && onSubmit) onSubmit(payload); else if (onAdd) { onAdd(payload); setData({...data, amt: '', players: []}); } 
     };
     return (
@@ -311,7 +389,16 @@ export const MahjongForm: React.FC<FormProps> = ({ onAdd, onSubmit, records, ini
                     {players?.length === 0 && <span className="text-xs text-gray-400">請至設定新增麻友</span>}
                 </div>
             </div>
-            <div className="relative border-b border-gray-200"><span className={`absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans ${data.win?'text-muji-red':'text-muji-green'}`}>$</span><input type="number" inputMode="numeric" min="0" placeholder="0" value={data.amt} onChange={e => {const val = e.target.value; if (val === '' || (Number(val) >= 0 && !val.includes('-'))) setData({...data, amt: val});}} onKeyDown={e => ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()} className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.win?'text-muji-red':'text-muji-green'}`}/></div>
+            <div className="relative border-b border-gray-200"><span className={`absolute left-0 top-1/2 -translate-y-1/2 text-xl font-sans ${data.win?'text-muji-red':'text-muji-green'}`}>$</span>
+                <input 
+                    type="text" 
+                    inputMode="decimal"
+                    placeholder="0" 
+                    value={data.amt} 
+                    onChange={handleAmountChange}
+                    className={`w-full pl-6 py-2 text-4xl font-sans font-bold text-right outline-none bg-transparent ${data.win?'text-muji-red':'text-muji-green'}`}
+                />
+            </div>
             <button type="button" onClick={submit} className="w-full py-4 bg-muji-ink text-white rounded-xl shadow-lg hover:opacity-90 transition tracking-widest uppercase text-xs active:scale-[0.98]">{isEditing ? "確認修改" : "儲存戰績"}</button>
         </div>
     );

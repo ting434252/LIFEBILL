@@ -184,7 +184,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ records, onDelete, o
                                                         <span className="flex items-center justify-center text-[8px] text-white font-bold bg-muji-ink rounded-full px-1.5 h-3 leading-[12px] scale-90 origin-center whitespace-nowrap">{info.count}將</span>
                                                     )}
                                                 </div>
-                                                <span className={`text-[9px] font-bold tracking-tight leading-none ${info.total >= 0 ? 'text-muji-red' : 'text-muji-green'}`}>{Math.abs(info.total)}</span>
+                                                <span className={`text-[9px] font-bold tracking-tight leading-none ${info.total >= 0 ? 'text-muji-red' : 'text-muji-green'}`}>{formatMoney(Math.abs(info.total)).replace(/(\.00|NT)/g, '')}</span>
                                             </div>
                                         )}
                                     </div> 

@@ -14,6 +14,7 @@ import {
   SortableContext, 
   sortableKeyboardCoordinates, 
   verticalListSortingStrategy,
+  rectSortingStrategy,
   useSortable 
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -30,7 +31,7 @@ const SettingsItem = ({ icon, label, subLabel, onClick, isDestructive }: any) =>
 
 // --- DND Components ---
 
-const SortableItem = ({ id, children, onRemove }: { id: string, children: React.ReactNode, onRemove?: () => void }) => {
+const SortableItem = ({ id, onRemove }: { id: string, onRemove: (id: string) => void }) => {
     const {
         attributes,
         listeners,
@@ -48,9 +49,62 @@ const SortableItem = ({ id, children, onRemove }: { id: string, children: React.
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-manipulation relative">
-             <div className="group flex items-center justify-between bg-white border border-gray-100 px-4 py-3 rounded-xl shadow-sm">
-                {children}
+        <div ref={setNodeRef} style={style} className="touch-manipulation relative mb-2">
+             <div className="flex items-center justify-between bg-white border border-gray-100 px-4 py-3 rounded-xl shadow-sm">
+                <span className="text-sm text-gray-600 font-medium truncate flex-1">{id}</span>
+                <div className="flex items-center gap-1">
+                    {/* Drag Handle - Apply listeners HERE only */}
+                    {/* touch-none is critical for mobile drag to not scroll the page */}
+                    <div {...attributes} {...listeners} className="p-2 cursor-grab touch-none text-gray-300 hover:text-muji-ink active:cursor-grabbing">
+                        <Icons.List size={18} className="opacity-70"/>
+                    </div>
+                    <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
+                    <button 
+                        onPointerDown={(e) => e.stopPropagation()} 
+                        onClick={(e)=> {e.stopPropagation(); onRemove(id);}} 
+                        className="w-8 h-8 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                    >
+                        <Icons.X size={14}/>
+                    </button>
+                </div>
+             </div>
+        </div>
+    );
+};
+
+const SortableGridItem = ({ id, onRemove }: { id: string, onRemove: (id: string) => void }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 1,
+        opacity: isDragging ? 0.8 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="touch-manipulation relative">
+             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 aspect-[4/3] flex flex-col items-center justify-center relative group">
+                <button 
+                    onPointerDown={(e) => e.stopPropagation()} 
+                    onClick={(e)=> {e.stopPropagation(); onRemove(id);}} 
+                    className="absolute top-1 right-1 p-2 text-gray-200 hover:text-red-400 hover:bg-red-50 rounded-full transition-colors z-20"
+                >
+                    <Icons.X size={16}/>
+                </button>
+                <div {...listeners} {...attributes} className="absolute top-1 left-1 p-2 text-gray-200 cursor-grab touch-none hover:text-muji-ink active:cursor-grabbing z-20">
+                    <Icons.List size={16} className="opacity-50"/>
+                </div>
+                <div className="text-center px-2">
+                     <span className="font-bold text-muji-text text-lg break-all line-clamp-2">{id}</span>
+                </div>
              </div>
         </div>
     );
@@ -60,9 +114,10 @@ const CategorySettings = ({ categories, onAdd, onRemove, setCategories, showNoti
     const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense');
     const [newCat, setNewCat] = useState('');
     
+    // Remove constraints for instant drag on handle
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(PointerSensor),
+        useSensor(TouchSensor),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
@@ -102,22 +157,9 @@ const CategorySettings = ({ categories, onAdd, onRemove, setCategories, showNoti
             <div className="flex-1 overflow-y-auto pr-1">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                     <SortableContext items={categories[activeTab]} strategy={verticalListSortingStrategy}>
-                        <div className="flex flex-col gap-2 content-start">
+                        <div className="flex flex-col content-start">
                             {categories[activeTab].map((cat: string) => (
-                                <SortableItem key={cat} id={cat}>
-                                    <span className="text-sm text-gray-600 font-medium">{cat}</span>
-                                    <div className="flex items-center gap-1">
-                                        <div className="p-2 cursor-move text-gray-300"><Icons.List size={14} className="opacity-50"/></div>
-                                        <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
-                                        <button 
-                                            onPointerDown={(e) => e.stopPropagation()} 
-                                            onClick={(e)=> {e.stopPropagation(); onRemove(activeTab, cat);}} 
-                                            className="w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                                        >
-                                            <Icons.X size={14}/>
-                                        </button>
-                                    </div>
-                                </SortableItem>
+                                <SortableItem key={cat} id={cat} onRemove={(id) => onRemove(activeTab, id)} />
                             ))}
                         </div>
                     </SortableContext>
@@ -131,9 +173,10 @@ const CategorySettings = ({ categories, onAdd, onRemove, setCategories, showNoti
 const PlayerSettings = ({ players, onAdd, onRemove, setPlayers, showNotification }: any) => {
     const [newPlayer, setNewPlayer] = useState('');
     
+    // Remove constraints for instant drag on handle
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-        useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+        useSensor(PointerSensor),
+        useSensor(TouchSensor),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
@@ -165,23 +208,10 @@ const PlayerSettings = ({ players, onAdd, onRemove, setPlayers, showNotification
             </div>
             <div className="flex-1 overflow-y-auto pr-1">
                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={players} strategy={verticalListSortingStrategy}>
-                        <div className="flex flex-col gap-2 content-start">
+                    <SortableContext items={players} strategy={rectSortingStrategy}>
+                        <div className="grid grid-cols-3 gap-3">
                             {players.map((p: string) => (
-                                <SortableItem key={p} id={p}>
-                                    <span className="text-sm text-gray-600 font-medium">{p}</span>
-                                    <div className="flex items-center gap-1">
-                                        <div className="p-2 cursor-move text-gray-300"><Icons.List size={14} className="opacity-50"/></div>
-                                        <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
-                                        <button 
-                                            onPointerDown={(e) => e.stopPropagation()} 
-                                            onClick={(e)=>{e.stopPropagation(); onRemove(p);}} 
-                                            className="w-6 h-6 flex items-center justify-center rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
-                                        >
-                                            <Icons.X size={14}/>
-                                        </button>
-                                    </div>
-                                </SortableItem>
+                                <SortableGridItem key={p} id={p} onRemove={onRemove} />
                             ))}
                         </div>
                     </SortableContext>

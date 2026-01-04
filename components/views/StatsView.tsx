@@ -50,9 +50,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ records, category, categor
             percent: totalAmount ? Math.round((grp[k] / totalAmount) * 100) : 0
         })).sort((a, b) => b.value - a.value);
         
-        const categoryTotals = Object.keys(grp)
-            .map(k => ({ subCategory: k, amount: grp[k] }))
-            .sort((a, b) => b.amount - a.amount);
+        // categoryTotals removed as per request, but logic kept in case needed for other calculations (none here)
 
         let trendData: any[] = [];
         if (timeRange === 'year') {
@@ -73,7 +71,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ records, category, categor
             trendData = daily;
         }
 
-        return { chartData, categoryTotals, trendData };
+        return { chartData, trendData };
     }, [filteredRecords, category, timeRange, records, dailyType]);
 
     // Tea Stats
@@ -241,22 +239,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ records, category, categor
                             </div>
                         ) : <div className="text-center py-10 text-gray-300">無數據</div>}
                     </div>
-
-                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-                        <h3 className="text-xs tracking-widest uppercase mb-3 text-gray-400">{dailyType === 'expense' ? '支出' : '收入'}類別總計</h3>
-                        {dailyStats.categoryTotals.map((e, i) => (
-                            <div key={i} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xs font-bold text-muji-ink w-4">{i+1}</span>
-                                    <div>
-                                        <p className="text-sm text-muji-text">{e.subCategory}</p>
-                                    </div>
-                                </div>
-                                <span className={`text-sm font-medium ${dailyType === 'income' ? 'text-muji-red' : 'text-muji-green'}`}>{formatMoney(e.amount)}</span>
-                            </div>
-                        ))}
-                        {dailyStats.categoryTotals.length === 0 && <div className="text-center py-4 text-gray-300 text-xs">無紀錄</div>}
-                    </div>
+                    {/* Category List Removed */}
                 </>
             )}
 
@@ -340,7 +323,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ records, category, categor
                                                 <span className="text-xs font-bold text-muji-ink flex items-center">
                                                     {item.rating}<Icons.Star size={10} fill={true} className="ml-0.5"/>
                                                 </span>
-                                                <span className="text-xs text-gray-400 mt-1">${item.amount}</span>
+                                                <span className="text-xs text-gray-400 mt-1">{formatMoney(item.amount)}</span>
                                             </div>
                                         </div>
                                     ))

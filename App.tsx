@@ -154,7 +154,7 @@ const App = () => {
     };
 
     // --- JSON Backup & Restore ---
-    const handleExportJSON = () => {
+    const handleExportJSON = async () => {
         const data = {
             version: '1.0',
             exportedAt: new Date().toISOString(),
@@ -164,11 +164,27 @@ const App = () => {
             records,
             templates
         };
+        const fileName = `life_journal_backup_${year}_${new Date().toISOString().split('T')[0]}.json`;
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        
+        // Try Web Share API Level 2 (for mobile experience)
+        if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'application/json' })] })) {
+            try {
+                await navigator.share({
+                    files: [new File([blob], fileName, { type: 'application/json' })],
+                    title: 'Life Journal Backup',
+                });
+                return; // Shared successfully
+            } catch (e) {
+                // Ignore AbortError if user cancelled share, fallthrough to download
+            }
+        }
+
+        // Fallback to classic download
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `life_journal_backup_${year}_${new Date().toISOString().split('T')[0]}.json`;
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -212,14 +228,31 @@ const App = () => {
         event.target.value = '';
     };
 
-    const exportToExcel = () => {
-        const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + "日期,類別,項目,金額,評分\n" + records.map(e => {
+    const exportToExcel = async () => {
+        const csvContent = "\uFEFF" + "日期,類別,項目,金額,評分\n" + records.map(e => {
             const item = e.category === 'daily' ? (e as DailyRecord).subCategory : e.category === 'tea' ? (e as any).shop : '麻將';
             return `${e.date},${e.category},${item},${e.amount},${(e as any).rating || ''}`;
         }).join("\n");
+        const fileName = `life_journal_${year}.csv`;
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+
+         // Try Web Share API Level 2 (for mobile experience)
+         if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: 'text/csv' })] })) {
+            try {
+                await navigator.share({
+                    files: [new File([blob], fileName, { type: 'text/csv' })],
+                    title: 'Life Journal Report',
+                });
+                return;
+            } catch (e) {
+                // Fallthrough
+            }
+        }
+
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a"); 
-        link.setAttribute("href", encodeURI(csvContent)); 
-        link.setAttribute("download", `life_journal_${year}.csv`);
+        link.href = url;
+        link.download = fileName;
         document.body.appendChild(link); 
         link.click();
         document.body.removeChild(link);
