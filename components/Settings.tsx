@@ -45,7 +45,7 @@ const SortableItem = ({ id, children, onRemove }: { id: string, children: React.
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none relative">
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-manipulation relative">
              <div className="group flex items-center justify-between bg-white border border-gray-100 px-4 py-3 rounded-xl shadow-sm">
                 {children}
              </div>
@@ -71,7 +71,7 @@ const SortableGridItem = ({ id, children, onRemove }: { id: string, children: Re
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none relative">
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-manipulation relative">
             <div className="group relative bg-white border border-gray-100 px-2 py-3 rounded-xl shadow-sm text-center flex flex-col items-center justify-between min-h-[80px] h-full">
                 {children}
             </div>
